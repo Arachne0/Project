@@ -1,7 +1,7 @@
 from fiar_env import Fiar, turn, action2d_ize
 import numpy as np
+import wandb
 from model.qrdqn import QRDQN
-from gym_4iar.prev_codes.mcts import MCTSPlayer
 
 
 def evaluation_against_random(env, model):
@@ -25,6 +25,7 @@ def evaluation_against_random(env, model):
             else:
                 action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
                 action = action[0]
+
             # action = env.action_space.sample()
             action2d = action2d_ize(action)
 
@@ -67,6 +68,9 @@ learning_starts = 1000
 eps = 0.05
 
 if __name__ == '__main__':
+
+    wandb.init(project="4iar_QR-DQN")
+
     env = Fiar()
     obs, _ = env.reset()
 
@@ -88,18 +92,35 @@ if __name__ == '__main__':
     obs_post[0] = obs[player_myself]
     obs_post[1] = obs[player_enemy]
     obs_post[2] = np.zeros_like(obs[0])
+    # obs_post = obs[player_myself] + obs[player_enemy]*(-1)
     c = 0
     num_timesteps = 0
-    ep = 1
-
-    mcts_player = MCTSPlayer(env, obs)
+    ep = 0
+    b_win = 0
+    w_win = 0
 
     while True:
-        action = mcts_player.get_action(obs)
-        action2d = action2d_ize(action)
+        # sample an action until a valid action is sampled
+        while True:
+            if obs[3].sum() == 36:
+                print('draw')
+                break
+            if np.random.rand() < eps:
+                action = env.action_space.sample()
+            else:
+                if player_myself == 0:  # black train version
+                    action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
+                    action = action[0]
+                else:
+                    action = env.action_space.sample()
 
-        if obs[3, action2d[0], action2d[1]] == 0:
-            break
+            # action = env.action_space.sample()
+            action2d = action2d_ize(action)
+
+            if obs[3, action2d[0], action2d[1]] == 0:
+                break
+        # if env.is_valid(action):
+        # 	break
 
         player_myself = turn(obs)
         player_enemy = 1 - player_myself
@@ -111,6 +132,7 @@ if __name__ == '__main__':
         obs_post[0] = obs[player_myself]
         obs_post[1] = obs[player_enemy]
         obs_post[2] = np.zeros_like(obs[0])
+        # obs_post = obs[player_myself] + obs[player_enemy] * (-1)
 
         c += 1
 
@@ -138,3 +160,18 @@ if __name__ == '__main__':
                 rewards, wons = evaluation_against_random(env, model)
                 # save model
                 model.save("qrdqn_fiar")
+
+            if obs[3].sum() == 36:
+                pass
+            elif player_myself == 0.0:
+                b_win += 1
+            elif player_myself == 1.0:
+                w_win += 1
+
+            b_wins = b_win / ep
+            w_wins = w_win / ep
+
+            print({"Episode ": ep, "episode steps": c,
+                   "black win (%)": round(b_wins, 3) * 100, "white win (%)": round(w_wins, 3) * 100})
+            print('\n\n')
+            # 나중에 이부분 round로 나두지말고 format으로 처리해서 부동소수점 문제 처리
