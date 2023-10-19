@@ -95,7 +95,7 @@ if __name__ == '__main__':
     # obs_post = obs[player_myself] + obs[player_enemy]*(-1)
     c = 0
     num_timesteps = 0
-    ep = 0
+    ep = 1
     b_win = 0
     w_win = 0
 
@@ -126,6 +126,7 @@ if __name__ == '__main__':
         player_enemy = 1 - player_myself
 
         obs, reward, terminated, info = env.step(action)
+
         reward = np.abs(reward)  # make them equalized for any player
         num_timesteps += 1
 
@@ -149,8 +150,23 @@ if __name__ == '__main__':
             obs, _ = env.reset()
             # print number of steps
             print('steps:', c)
-            # print player_myself, reward, ep in a line
-            print('ep:{}, player:{}, reward:{}'.format(ep, player_myself, reward))
+            print('player:{}, reward:{}'.format(player_myself, reward))
+
+            if reward == 0:
+                pass
+            else:
+                if player_myself == 0.0:
+                    b_win += 1
+                elif player_myself == 1.0:
+                    w_win += 1
+
+            b_wins = b_win / ep
+            w_wins = w_win / ep
+
+            print({"episode ": ep, "black win (%)": round(b_wins, 5) * 100, "white win (%)": round(w_wins, 5) * 100,
+                  "black wins time": b_win,"white wins time": w_win, "tie time": ep - b_win - w_win})
+            print('\n\n')
+            # 나중에 이부분 round로 나두지말고 format으로 처리해서 부동소수점 문제 처리
 
             c = 0
             ep += 1
@@ -160,18 +176,3 @@ if __name__ == '__main__':
                 rewards, wons = evaluation_against_random(env, model)
                 # save model
                 model.save("qrdqn_fiar")
-
-            if obs[3].sum() == 36:
-                pass
-            elif player_myself == 0.0:
-                b_win += 1
-            elif player_myself == 1.0:
-                w_win += 1
-
-            b_wins = b_win / ep
-            w_wins = w_win / ep
-
-            print({"Episode ": ep, "episode steps": c,
-                   "black win (%)": round(b_wins, 3) * 100, "white win (%)": round(w_wins, 3) * 100})
-            print('\n\n')
-            # 나중에 이부분 round로 나두지말고 format으로 처리해서 부동소수점 문제 처리

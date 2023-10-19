@@ -28,14 +28,15 @@ pip install wandb
 Task : four in a row (9 x 4)
 
 
-### Todo
+### Problem
 
-model.qrdqn 3번 kill함 
-지금 코드가 mcts만 돌아가도록 만들었음
-qrdqn 다 빼놓음
-1. 이제 해야할게 mcts에서 받아온 승률 가지고 qrdqn를 해야하지 않나
-2. 아니면 CNN 끝나자마자 코드를 QRDQN에게 줘서 강화학습을 하거나 
+간헐적으로 obs[3] 이 36이 아닌데 draw가 찍힘
+이게 왜 그러는거지
 
+### version
 
+black 학습, white 랜덤
 
-
+black win -> reward : 1
+white win -> reward : abs(-1)
+draw -> reward : 0

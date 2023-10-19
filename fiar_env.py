@@ -27,7 +27,12 @@ def action1d_ize(action):
     return map[action[0],action[1]]
 
 def winning(state, player=0):
-    return 1 if np.all(state[TURN_CHNL] == player) else -1 # winning of player
+    if np.all(state[3].sum() == 36):
+        return 0
+    elif np.all(state[TURN_CHNL] == player):
+        return 1
+    else:
+        return -1
 
 
 def turn(state):
@@ -385,8 +390,6 @@ class Fiar(gym.Env):
         self.state_ = next_state(self.state_, action)
         self.done = game_ended(self.state_)
 
-
-
         return np.copy(self.state_), self.reward(), self.done, self.info()
 
 
@@ -427,7 +430,6 @@ class Fiar(gym.Env):
         Get's the winner in BLACK's perspective
         :return: 1 for black's win, -1 for white's win
         """
-
         if self.game_ended():
             return winning(self.state_, self.player)
         else:
