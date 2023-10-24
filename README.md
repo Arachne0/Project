@@ -31,7 +31,8 @@ Task : four in a row (9 x 4)
 ### Problem
 
 간헐적으로 obs[3] 이 36이 아닌데 draw가 찍힘
-이게 왜 그러는거지
+이게 왜 그러는건지 잘 모르겠음
+draw일 떄도 간혹 이러는 거라 디버깅 찍어보기도 쉽지 않음
 
 ### version
 
@@ -40,3 +41,7 @@ black 학습, white 랜덤
 black win -> reward : 1
 white win -> reward : abs(-1)
 draw -> reward : 0
+
+player_myself = 0 , player_enemy = 1 일때 흑이 돌을 놓을 차례
+player_myself = 1 , player_enemy = 0 일때 백이 돌을 놓을 차례
+

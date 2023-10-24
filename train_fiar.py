@@ -4,7 +4,7 @@ import wandb
 from model.qrdqn import QRDQN
 
 
-def evaluation_against_random(env, model):
+def self_play(env, model):
     won_side = []
     rewards = []
     obs, _ = env.reset()
@@ -99,6 +99,9 @@ if __name__ == '__main__':
     b_win = 0
     w_win = 0
 
+    print('도레미파솔라시도')
+    rewards, wons = self_play(env, model)
+
     while True:
         # sample an action until a valid action is sampled
         while True:
@@ -127,7 +130,7 @@ if __name__ == '__main__':
 
         obs, reward, terminated, info = env.step(action)
 
-        reward = np.abs(reward)  # make them equalized for any player
+        # reward = np.abs(reward)  # make them equalized for any player
         num_timesteps += 1
 
         obs_post[0] = obs[player_myself]
@@ -172,7 +175,7 @@ if __name__ == '__main__':
             ep += 1
 
             # evaluation against random agent
-            if ep % 1000 == 0:
-                rewards, wons = evaluation_against_random(env, model)
+            # if ep % 1000 == 0:
+            #    rewards, wons = evaluation_against_random(env, model)
                 # save model
-                model.save("qrdqn_fiar")
+            #    model.save("qrdqn_fiar")
