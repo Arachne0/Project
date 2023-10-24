@@ -1,6 +1,8 @@
 from fiar_env import Fiar, turn, action2d_ize
 import numpy as np
 import wandb
+
+from collections import deque
 from model.qrdqn import QRDQN
 
 
@@ -51,9 +53,11 @@ def self_play(env, model):
             if obs[3].sum() == 36:
                 print('draw')
             obs, _ = env.reset()
+
             # print number of steps
-            # if player_myself == 1:
-            # 	reward *= -1
+            if player_myself == 1:
+                reward *= -1
+
             rewards.append(reward)
             won_side.append(player_myself)
             c += 1
@@ -73,6 +77,8 @@ if __name__ == '__main__':
 
     env = Fiar()
     obs, _ = env.reset()
+    buffer_size = 1000
+    data_buffer = deque(maxlen=buffer_size)
 
     policy_kwargs = dict(n_quantiles=50)
     model = QRDQN("MlpPolicy", env, policy_kwargs=policy_kwargs, verbose=1, learning_starts=learning_starts)
@@ -99,8 +105,12 @@ if __name__ == '__main__':
     b_win = 0
     w_win = 0
 
-    print('도레미파솔라시도')
     rewards, wons = self_play(env, model)
+    print('self-play!')
+
+    for i in range(len(rewards)):
+        data_buffer.append((rewards, wons))
+
 
     while True:
         # sample an action until a valid action is sampled
