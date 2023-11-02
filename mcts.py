@@ -187,9 +187,8 @@ class MCTSPlayer(object):
         self.mcts.update_with_move(-1)
 
     def get_action(self, board):
-        sensible_moves = board.availables
-        if len(sensible_moves) > 0:
-            move = self.mcts.get_move(board)
+        if board[3].sum() < 36:
+            move = self.mcts.get_move(board.reshape(*[1, *board.shape]))[0]
             self.mcts.update_with_move(-1)
             return move
         else:

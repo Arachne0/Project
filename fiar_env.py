@@ -337,22 +337,7 @@ class Fiar(gym.Env):
         self.state_history = []
         self.action_history = []
         self.reward_history = []
-        # NOTICE: the visualize option in here is commented since I changed my mind to use pygame.
-        # However, if someone need to wants to visualize with matplotlib for dependency or setting issue,
-        # then it can be helpful using 'terminal' mode with the following code.
-        # if visualize is True:
-        #     self.figure = plt.figure(1, figsize=(9, 4))
-        #     fig = plt.figure(1, figsize=(9, 4))
-        #     axs = plt.axes()
-        #     axs.axis('equal')
-        #     # plt.title("Scatter plot")
-        #     plt.xlim([0, 9])
-        #     plt.ylim([0, 4])
-        #     plt.xticks(np.int16(np.linspace(0, 9, 10)))
-        #     plt.yticks(np.int16(np.linspace(0, 4, 5)))
-        #
-        #     plt.grid(True)
-        #     plt.show()
+
 
     def init_state(self):
         """

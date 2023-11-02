@@ -4,7 +4,7 @@ import wandb
 
 from collections import deque
 from mcts import MCTSPlayer
-from model.qrdqn import QRDQN
+from model.dqn import DQN
 
 
 def self_play(env, model):
@@ -28,8 +28,14 @@ def self_play(env, model):
             if np.random.rand() < eps:
                 action = env.action_space.sample()
             else:
+                move, move_probs = MCTSPlayer.get_action(env, obs_post)
+                print(move)
                 action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
                 action = action[0]
+
+
+
+
 
             # action = env.action_space.sample()
             action2d = action2d_ize(action)
@@ -98,20 +104,15 @@ if __name__ == '__main__':
     buffer_size = 1000
     data_buffer = deque(maxlen=buffer_size)
 
-    policy_kwargs = dict(n_quantiles=50)
-    model = QRDQN("MlpPolicy", env, policy_kwargs=policy_kwargs, verbose=1, learning_starts=learning_starts)
+    model = DQN("MlpPolicy", env, verbose=1, learning_starts=learning_starts)
 
     total_timesteps, callback = model._setup_learn(
         total_timesteps,
         callback=None,
         reset_num_timesteps=True,
-        tb_log_name="QRDQN_fiar",
+        tb_log_name="DQN_fiar",
         progress_bar=True,
     )
-
-    mcts_player = MCTSPlayer(c_puct=self.c_puct,
-                             n_playout=self.n_playout,
-                             is_selfplay=1)
 
     player_myself = turn(obs)
     player_enemy = 1 - player_myself
@@ -121,14 +122,29 @@ if __name__ == '__main__':
     obs_post[1] = obs[player_enemy]
     obs_post[2] = np.zeros_like(obs[0])
     # obs_post = obs[player_myself] + obs[player_enemy]*(-1)
+
     c = 0
     num_timesteps = 0
     ep = 1
     b_win = 0
     w_win = 0
 
+    c_puct = 5
+    n_playout = 2000
+    mcts_player = MCTSPlayer(c_puct, n_playout)
+
+
     rewards, wons = self_play(env, model)
     print('self-play!')
+
+
+
+
+
+
+
+
+
 
     for i in range(len(rewards)):
         data_buffer.append((rewards, wons))
