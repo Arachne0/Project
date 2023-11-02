@@ -3,15 +3,18 @@ import numpy as np
 import wandb
 
 from collections import deque
+from mcts import MCTSPlayer
 from model.qrdqn import QRDQN
 
 
 def self_play(env, model):
-    won_side = []
-    rewards = []
+
+    won_side, mcts_probs, rewards = [], [], []
+
     obs, _ = env.reset()
     player_myself = turn(obs)
     player_enemy = 1 - player_myself
+
     obs_post[0] = obs[player_myself]
     obs_post[1] = obs[player_enemy]
     obs_post[2] = np.zeros_like(obs[0])
@@ -52,6 +55,7 @@ def self_play(env, model):
         if terminated:
             if obs[3].sum() == 36:
                 print('draw')
+                env.render()
             obs, _ = env.reset()
 
             # print number of steps
@@ -59,12 +63,26 @@ def self_play(env, model):
                 reward *= -1
 
             rewards.append(reward)
+            # mcts_probs()
             won_side.append(player_myself)
+
             c += 1
             if c == 100:
                 break
 
     return np.array(rewards), np.array(won_side)
+# 지금 그냥 rewards랑 won_side 이렇게 반환하고 있는데
+# 총 결국엔 총 4개를 반환해야함
+# reward (무승부 판별) , end state , mcts probablity, winner (흑 or 백 or 무승부)
+
+
+
+
+
+
+
+
+
 
 
 total_timesteps = 100000
@@ -91,6 +109,10 @@ if __name__ == '__main__':
         progress_bar=True,
     )
 
+    mcts_player = MCTSPlayer(c_puct=self.c_puct,
+                             n_playout=self.n_playout,
+                             is_selfplay=1)
+
     player_myself = turn(obs)
     player_enemy = 1 - player_myself
 
@@ -111,7 +133,7 @@ if __name__ == '__main__':
     for i in range(len(rewards)):
         data_buffer.append((rewards, wons))
 
-
+    env.reset()
     while True:
         # sample an action until a valid action is sampled
         while True:
@@ -141,6 +163,8 @@ if __name__ == '__main__':
         obs, reward, terminated, info = env.step(action)
 
         # reward = np.abs(reward)  # make them equalized for any player
+        # -1 로 reward가 들어가게되면 문제가 생기긴하지만 일단 lock
+
         num_timesteps += 1
 
         obs_post[0] = obs[player_myself]

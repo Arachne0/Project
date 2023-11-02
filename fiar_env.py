@@ -27,8 +27,8 @@ def action1d_ize(action):
     return map[action[0],action[1]]
 
 def winning(state, player=0):
-    if np.all(state[3].sum() == 36):
-        return 0
+    if (state[3].sum() == 36):
+        return np.nan
     elif np.all(state[TURN_CHNL] == player):
         return 1
     else:
