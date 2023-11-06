@@ -3,20 +3,21 @@ import numpy as np
 import wandb
 
 from collections import deque
-from mcts import MCTSPlayer
+from mcts import MCTS, MCTSPlayer
 from model.dqn import DQN
 
 
 def self_play(env, model):
 
     won_side, mcts_probs, rewards = [], [], []
-
     obs, _ = env.reset()
-    player_myself = turn(obs)
-    player_enemy = 1 - player_myself
 
-    obs_post[0] = obs[player_myself]
-    obs_post[1] = obs[player_enemy]
+    players = [0, 1]
+    player_0 = turn(obs)
+    player_1 = 1 - player_0
+
+    obs_post[0] = obs[player_0]
+    obs_post[1] = obs[player_1]
     obs_post[2] = np.zeros_like(obs[0])
     c = 0
 
@@ -28,13 +29,10 @@ def self_play(env, model):
             if np.random.rand() < eps:
                 action = env.action_space.sample()
             else:
-                move, move_probs = MCTSPlayer.get_action(env, obs_post)
-                print(move)
-                action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
-                action = action[0]
-
-
-
+                move = mcts_player.get_action(env, obs_post)
+                action = move
+                # action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
+                # action = action[0]
 
 
             # action = env.action_space.sample()
@@ -43,10 +41,10 @@ def self_play(env, model):
             if obs[3, action2d[0], action2d[1]] == 0:
                 break
 
-        player_myself = turn(obs)
-        player_enemy = 1 - player_myself
+        player_0 = turn(obs)
+        player_1 = 1 - player_0
 
-        if player_myself == 1:
+        if player_0 == 1:
             while True:
                 action = env.action_space.sample()
                 action2d = action2d_ize(action)
@@ -54,8 +52,8 @@ def self_play(env, model):
                     break
         obs, reward, terminated, info = env.step(action)
 
-        obs_post[0] = obs[player_myself]
-        obs_post[1] = obs[player_enemy]
+        obs_post[0] = obs[player_0]
+        obs_post[1] = obs[player_1]
         obs_post[2] = np.zeros_like(obs[0])
 
         if terminated:
@@ -65,12 +63,12 @@ def self_play(env, model):
             obs, _ = env.reset()
 
             # print number of steps
-            if player_myself == 1:
+            if player_0 == 1:
                 reward *= -1
 
             rewards.append(reward)
             # mcts_probs()
-            won_side.append(player_myself)
+            won_side.append(player_0)
 
             c += 1
             if c == 100:
@@ -97,7 +95,7 @@ eps = 0.05
 
 if __name__ == '__main__':
 
-    wandb.init(project="4iar_QR-DQN")
+    wandb.init(project="4iar_DQN")
 
     env = Fiar()
     obs, _ = env.reset()
@@ -114,12 +112,12 @@ if __name__ == '__main__':
         progress_bar=True,
     )
 
-    player_myself = turn(obs)
-    player_enemy = 1 - player_myself
+    player_0 = turn(obs)
+    player_1 = 1 - player_0
 
     obs_post = obs.copy()
-    obs_post[0] = obs[player_myself]
-    obs_post[1] = obs[player_enemy]
+    obs_post[0] = obs[player_0]
+    obs_post[1] = obs[player_1]
     obs_post[2] = np.zeros_like(obs[0])
     # obs_post = obs[player_myself] + obs[player_enemy]*(-1)
 
@@ -131,23 +129,16 @@ if __name__ == '__main__':
 
     c_puct = 5
     n_playout = 2000
-    mcts_player = MCTSPlayer(c_puct, n_playout)
 
+    mcts_player = MCTSPlayer(c_puct, n_playout)
 
     rewards, wons = self_play(env, model)
     print('self-play!')
 
 
-
-
-
-
-
-
-
-
     for i in range(len(rewards)):
         data_buffer.append((rewards, wons))
+
 
     env.reset()
     while True:
@@ -159,7 +150,7 @@ if __name__ == '__main__':
             if np.random.rand() < eps:
                 action = env.action_space.sample()
             else:
-                if player_myself == 0:  # black train version
+                if player_0 == 0:  # black train version
                     action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
                     action = action[0]
                 else:
@@ -170,11 +161,9 @@ if __name__ == '__main__':
 
             if obs[3, action2d[0], action2d[1]] == 0:
                 break
-        # if env.is_valid(action):
-        # 	break
 
-        player_myself = turn(obs)
-        player_enemy = 1 - player_myself
+        player_0 = turn(obs)
+        player_1 = 1 - player_0
 
         obs, reward, terminated, info = env.step(action)
 
@@ -183,8 +172,8 @@ if __name__ == '__main__':
 
         num_timesteps += 1
 
-        obs_post[0] = obs[player_myself]
-        obs_post[1] = obs[player_enemy]
+        obs_post[0] = obs[player_0]
+        obs_post[1] = obs[player_1]
         obs_post[2] = np.zeros_like(obs[0])
         # obs_post = obs[player_myself] + obs[player_enemy] * (-1)
 
@@ -203,14 +192,14 @@ if __name__ == '__main__':
             obs, _ = env.reset()
             # print number of steps
             print('steps:', c)
-            print('player:{}, reward:{}'.format(player_myself, reward))
+            print('player:{}, reward:{}'.format(player_0, reward))
 
             if reward == 0:
                 pass
             else:
-                if player_myself == 0.0:
+                if player_0 == 0.0:
                     b_win += 1
-                elif player_myself == 1.0:
+                elif player_0 == 1.0:
                     w_win += 1
 
             b_wins = b_win / ep

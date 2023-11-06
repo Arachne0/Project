@@ -1,4 +1,5 @@
 import random
+import math
 
 
 class Node:
@@ -9,22 +10,15 @@ class Node:
         self.visits = 0
         self.value = 0
 
+    def ucb_score(node):
+        if node.visits == 0:
+            return float('inf')
+        exploitation = node.value / node.visits
+        exploration = math.sqrt(2 * math.log(node.parent.visits) / node.visits)
+        return exploitation + exploration
 
-    def mcts(root, iterations):
-        for _ in range(iterations):
-            node = root
-            while not node.state.is_terminal() and not node.children:
-                node = select(node)
-
-            if not node.state.is_terminal():
-                node = expand(node)
-
-            result = simulate(node.state)
-            backpropagate(node, result)
-
-        return best_child(root)
     def select(node):
-        return max(node.children, key=ucb_score)
+        return max(node.children, key=node.ucb_score)
 
     def expand(node):
         actions = node.state.get_possible_actions()

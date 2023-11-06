@@ -223,22 +223,6 @@ def next_state(state, action1d):
     # Add piece
     state[player, action2d[0], action2d[1]] = 1
 
-    # # Get adjacent location and check whether the piece will be surrounded by opponent's piece
-    # adj_locs, surrounded = state_utils.adj_data(state, action2d, player)
-    # surrounded = False
-    #
-    # # Update pieces
-    # killed_groups = state_utils.update_pieces(state, adj_locs, player)
-    # killed_groups = []
-    #
-    # # If only killed one group, and that one group was one piece, and piece set is surrounded,
-    # # activate ko protection
-    # if len(killed_groups) == 1 and surrounded:
-    #     killed_group = killed_groups[0]
-    #     if len(killed_group) == 1:
-    #         ko_protect = killed_group[0]
-
-    # Update invalid moves
     state[INVD_CHNL] = state_utils.compute_invalid_moves(state, player, ko_protect)
     # state[INVD_CHNL] = state_utils.compute_invalid_moves(state, player, ko_protect)
 
@@ -324,15 +308,16 @@ def action_size(state=None, board_size: int = None):
     return m * n
 
 class Fiar(gym.Env):
-    def __init__(self, player = 0):
-        self.player = player #  0: black,  1: white
+    def __init__(self, player=0):
+        self.player = [0, 1]    # 0: black,  1: white
+        self.current_player = self.player[0]
 
         self.state_ = self.init_state()
         self.observation_space = spaces.Box(np.float32(0), np.float32(NUM_CHNLS),
                                                 shape=(NUM_CHNLS, 9, 4))
+        self.availables = list(range(36))
         self.action_space = spaces.Discrete(action_size(self.state_))
         self.done = False
-
         self.action = None
         self.state_history = []
         self.action_history = []
@@ -363,9 +348,10 @@ class Fiar(gym.Env):
         return observation, reward, done, info
         '''
         assert not self.done
+
         if isinstance(action, tuple) or isinstance(action, list) or isinstance(action, np.ndarray):
-            assert 0 <= action[0] < 9 #self.size
-            assert 0 <= action[1] < 4 #self.size
+            assert 0 <= action[0] < 9
+            assert 0 <= action[1] < 4
             # action = 9 * action[0] + action[1] # self.size * action[0] + action[1]
             action = action1d_ize(action)
 
@@ -376,7 +362,6 @@ class Fiar(gym.Env):
         self.done = game_ended(self.state_)
 
         return np.copy(self.state_), self.reward(), self.done, self.info()
-
 
     def reset(self, seed=None):
         '''
@@ -406,6 +391,14 @@ class Fiar(gym.Env):
 
     def game_ended(self):
         return self.done
+
+    def do_move(self, move):
+        self.states[move] = self.current_player
+        self.availables.remove(move)
+        self.current_player = (
+            self.players[0] if self.current_player == self.players[1]
+            else self.players[1]
+        )
 
     def __str__(self):
         return str_(self.state_)

@@ -3,8 +3,6 @@ import numpy as np
 import wandb
 
 from collections import deque
-from mcts import MCTSPlayer
-from model.dqn import DQN
 from model.qrdqn import QRDQN
 
 
@@ -99,8 +97,7 @@ if __name__ == '__main__':
     buffer_size = 1000
     data_buffer = deque(maxlen=buffer_size)
 
-    policy_kwargs = dict(n_quantiles=51)
-    model = DQN("MlpPolicy", env, policy_kwargs=policy_kwargs, verbose=1, learning_starts=learning_starts)
+    policy_kwargs = dict(n_quantiles=50)
     model = QRDQN("MlpPolicy", env, policy_kwargs=policy_kwargs, verbose=1, learning_starts=learning_starts)
 
     total_timesteps, callback = model._setup_learn(
