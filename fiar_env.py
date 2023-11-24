@@ -26,10 +26,10 @@ def action1d_ize(action):
     map = np.int16(np.linspace(0, 4 * 9 - 1, 4 * 9).reshape(9, 4))
     return map[action[0],action[1]]
 
-def winning(state, player=0):
+def winning(state):
     if (state[3].sum() == 36):
-        return np.nan
-    elif np.all(state[TURN_CHNL] == player):
+        return 0
+    elif (state[3].sum() // 2 == 1):
         return 1
     else:
         return -1
@@ -392,14 +392,6 @@ class Fiar(gym.Env):
     def game_ended(self):
         return self.done
 
-    def do_move(self, move):
-        self.states[move] = self.current_player
-        self.availables.remove(move)
-        self.current_player = (
-            self.players[0] if self.current_player == self.players[1]
-            else self.players[1]
-        )
-
     def __str__(self):
         return str_(self.state_)
 
@@ -409,9 +401,10 @@ class Fiar(gym.Env):
         :return: 1 for black's win, -1 for white's win
         """
         if self.game_ended():
-            return winning(self.state_, self.player)
+            return winning(self.state_)
         else:
             return 0
+
 
     def reward(self):
         return self.winner()

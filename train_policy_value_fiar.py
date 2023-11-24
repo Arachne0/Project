@@ -22,6 +22,8 @@ def self_play(env, model):
     c = 0
 
     while True:
+        env.reset()
+
         while True:
             if obs[3].sum() == 36:
                 print('draw')
@@ -31,49 +33,51 @@ def self_play(env, model):
             else:
                 move = mcts_player.get_action(env, obs_post)
                 action = move
-                # action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
-                # action = action[0]
-
-            # action = env.action_space.sample()
             action2d = action2d_ize(action)
 
             if obs[3, action2d[0], action2d[1]] == 0:
                 break
+                # store the data
 
-        player_0 = turn(obs)
-        player_1 = 1 - player_0
+                # won_side.append(self.board.current_state())
+                # mcts_probs.append(move_probs)
+                # rewards.append(self.board.current_player)
 
-        if player_0 == 1:
-            while True:
-                action = env.action_space.sample()
-                action2d = action2d_ize(action)
-                if obs[3, action2d[0], action2d[1]] == 0:
-                    break
-        obs, reward, terminated, info = env.step(action)
+            player_0 = turn(obs)
+            player_1 = 1 - player_0
 
-        obs_post[0] = obs[player_0]
-        obs_post[1] = obs[player_1]
-        obs_post[2] = np.zeros_like(obs[0])
-
-        if terminated:
-            if obs[3].sum() == 36:
-                print('draw')
-                env.render()
-            obs, _ = env.reset()
-
-            # print number of steps
             if player_0 == 1:
-                reward *= -1
+                while True:
+                    action = env.action_space.sample()
+                    action2d = action2d_ize(action)
+                    if obs[3, action2d[0], action2d[1]] == 0:
+                        break
 
-            rewards.append(reward)
-            # mcts_probs()
-            won_side.append(player_0)
+            obs, reward, terminated, info = env.step(action)
 
-            c += 1
-            if c == 100:
-                break
+            obs_post[0] = obs[player_0]
+            obs_post[1] = obs[player_1]
+            obs_post[2] = np.zeros_like(obs[0])
 
-    return np.array(rewards), np.array(won_side)
+            if terminated:
+                if obs[3].sum() == 36:
+                    print('draw')
+                    env.render()
+                obs, _ = env.reset()
+
+                # print number of steps
+                if player_0 == 1:
+                    reward *= -1
+
+                rewards.append(reward)
+                # mcts_probs()
+                won_side.append(player_0)
+
+                c += 1
+                if c == 100:
+                    break
+
+        return np.array(rewards), np.array(won_side)
 # 지금 그냥 rewards랑 won_side 이렇게 반환하고 있는데
 # 총 결국엔 총 4개를 반환해야함
 # reward (무승부 판별) , end state , mcts probablity, winner (흑 or 백 or 무승부)
@@ -125,15 +129,11 @@ if __name__ == '__main__':
     ep = 1
     b_win = 0
     w_win = 0
-
     c_puct = 5
     n_playout = 2000
-
     mcts_player = MCTSPlayer(c_puct, n_playout)
 
     rewards, wons = self_play(env, model)
-    print('self-play!')
-
 
     for i in range(len(rewards)):
         data_buffer.append((rewards, wons))

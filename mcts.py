@@ -7,16 +7,16 @@ from fiar_env import action2d_ize
 def rollout_policy_fn(board):
     """a coarse, fast version of policy_fn used in the rollout phase."""
     # rollout randomly
-    availables = list(range(36))
+    if board[3].sum() == 36:
+        return []
+    availables = [i for i in range(36) if board[i // 4][i % 4] != 1]
     action_probs = np.random.rand(len(availables))
-    return zip(availables, action_probs)
+    return list(zip(availables, action_probs))
 
 
 def policy_value_fn(board):
-    """a function that takes in a state and outputs a list of (action, probability)
-    tuples and a score for the state"""
     # return uniform probabilities and 0 score for pure MCTS
-    availables = list(range(36))
+    availables = [i for i in range(36) if not np.any(board[3][i // 4][i % 4] == 1)]
     action_probs = np.ones(len(availables)) / len(availables)
     return zip(availables, action_probs), 0
 
@@ -112,14 +112,13 @@ class MCTS(object):
         State is modified in-place, so a copy must be provided.
         """
         node = self._root
+        env.reset()
         while(1):
             if node.is_leaf():
                 break
-
             # Greedily select next move.
             action, node = node.select(self._c_puct)
-            env.do_move(action)
-
+            obs, reward, terminated, info = env.step(action)
         action_probs, _ = self._policy(obs)
 
         # Check for end of game
@@ -133,37 +132,6 @@ class MCTS(object):
 
         # Evaluate the leaf node by random rollout
         leaf_value = self._evaluate_rollout(env, obs)
-        # Update value and visit count of nodes in this tr    def _evaluate_rollout(self, env, state, limit=1000):
-        #         """Use the rollout policy to play until the end of the game,
-        #         returning +1 if the current player wins, -1 if the opponent wins,
-        #         and 0 if it is a tie.
-        #         """
-        #         player = env.player
-        #         for i in range(limit):
-        #             result = env.winner()
-        #             if result == 1:
-        #                 winner = 1
-        #                 end = True
-        #             elif result == -1:
-        #                 winner = -1
-        #                 end = True
-        #             else:
-        #                 winner = 0
-        #                 end = False
-        #             if end:
-        #                 break
-        #
-        #             action_probs = rollout_policy_fn(state)
-        #             max_action = max(action_probs, key=itemgetter(1))[0]
-        #             print(max_action)
-        #             env.do_move(max_action)
-        #         else:
-        #             # If no break from the loop, issue a warning.
-        #             print("WARNING: rollout reached move limit")
-        #         if winner == 0:  # tie
-        #             return 0
-        #         else:
-        #             return 1 if winner == player else -1taversal.
         node.update_recursive(-leaf_value)
 
     def _evaluate_rollout(self, env, obs, limit=1000):
@@ -187,25 +155,27 @@ class MCTS(object):
                 break
 
             action_probs = rollout_policy_fn(obs[3])
-            max_action = max(action_probs, key=itemgetter(1))[0]
 
-            print(max_action)
-
-            obs, reward, terminated, info = env.step(max_action)
-            player = 1 - player
-
+            if len(action_probs) > 0:
+                max_action = max(action_probs, key=itemgetter(1))[0]
+                obs, reward, terminated, info = env.step(max_action)
+                if terminated == 0:
+                    player = 1 - player
+                elif winner == 0:  # tie
+                    return 0
+                else:
+                    return 1 if winner == player else -1
+            else:
+                print("WARNING: Empty action_probs in rollout")
+                break
         else:
             # If no break from the loop, issue a warning.
             print("WARNING: rollout reached move limit")
-        if winner == 0:  # tie
-            return 0
-        else:
-            return 1 if winner == player else -1
+
 
     def get_move(self, env, state):
         """Runs all playouts sequentially and returns the most visited action.
         state: the current game state
-
         Return: the selected action
         """
         for n in range(self._n_playout):
