@@ -125,23 +125,28 @@ class MCTS(object):
             # Greedily select next move.
             action, node = node.select(self._c_puct)
             obs, reward, terminated, info = env.step(action)
-        action_probs, _ = self._policy(obs)
+        action_probs, leaf_value = self._policy(obs)
 
         # Check for end of game
-        result = env.winner()
-        if result == 0:
-            end = False
-        else:
-            end = True
+        end, result = env.winner()
+
         if not end:
             node.expand(action_probs)
+        else:
+            # for end state，return the "true" leaf_value
+            if result == 0:  # tie
+                leaf_value = 0.0
+            else:
+                leaf_value = (
+                    1.0 if result == 1 else -1.0
+                )
 
-        # Evaluate the leaf node by random rollout
-        leaf_value = self._evaluate_rollout(env, obs)
         node.update_recursive(-leaf_value)
 
 
-    def get_move_probs(self, env, state, temp=1e-3): # board.shape = (5,9,4)
+
+
+    def get_move_probs(self, env, state, temp=1e-3): # state.shape = (9,4)
 
         """Run all playouts sequentially and return the available actions and
         their corresponding probabilities.
@@ -152,6 +157,7 @@ class MCTS(object):
             state_copy = copy.deepcopy(state)
             self._playout(env, state_copy)   # state_copy.shape = (5,9,4)
 
+        print('hello')
         # calc the move probabilities based on visit counts at the root node
         act_visits = [(act, node._n_visits)
                       for act, node in self._root._children.items()]
@@ -162,63 +168,6 @@ class MCTS(object):
 
 
 
-
-    def _evaluate_rollout(self, env, obs, limit=1000):
-        # env = game, obs.shape = (5,9,4)
-
-        """Use the rollout policy to play until the end of the game,
-        returning +1 if the current player wins, -1 if the opponent wins,
-        and 0 if it is a tie.
-        """
-        player = env.current_player
-        for i in range(limit):
-            result = env.winner()
-
-            if result == 1:
-                winner = 1
-                end = True
-            elif result == -1:
-                winner = -1
-                end = True
-            else:
-                winner = 0
-                end = False
-            if end:
-                break
-
-            action_probs = rollout_policy_fn(obs)
-
-            if len(action_probs) > 0:
-
-                max_action = max(action_probs, key=itemgetter(1))[0]
-                obs, reward, terminated, info = env.step(max_action)
-
-
-
-                if terminated == 0:
-                    player = 1 - player
-                elif winner == 0:  # tie
-                    return 0
-                else:
-                    return 1 if winner == player else -1
-            else:
-                print("WARNING: Empty action_probs in rollout")
-                break
-        else:
-            # If no break from the loop, issue a warning.
-            print("WARNING: rollout reached move limit")
-
-
-    def get_move(self, env, state):
-        """Runs all playouts sequentially and returns the most visited action.
-        state: the current game state
-        Return: the selected action
-        """
-        for n in range(self._n_playout):
-            state_copy = copy.deepcopy(state)
-            self._playout(env, state_copy)
-        return max(self._root._children.items(),
-                   key=lambda act_node: act_node[1]._n_visits)[0]
 
     def update_with_move(self, last_move):
         """Step forward in the tree, keeping everything we already know
@@ -256,6 +205,7 @@ class MCTSPlayer(object):
         if len(sensible_moves) > 0:
             acts, probs = self.mcts.get_move_probs(env, board, temp)
             # board.shape = (5,9,4)
+            print(probs)
 
             move_probs[list(acts)] = probs
 
@@ -263,7 +213,7 @@ class MCTSPlayer(object):
         # 차근차근 여기 밑에도 수정해야함
 
         if board[3].sum() < 36:
-            move = self.mcts.get_move(env, board[3])
+            move = self.mcts.get_move_probs(env, board[3])
             self.mcts.update_with_move(-1)
             return move
         else:

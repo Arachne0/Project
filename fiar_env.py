@@ -22,17 +22,19 @@ def action2d_ize(action):
     action2d = np.where(map == action)
     return int(action2d[0]), int(action2d[1])
 
+
 def action1d_ize(action):
     map = np.int16(np.linspace(0, 4 * 9 - 1, 4 * 9).reshape(9, 4))
     return map[action[0],action[1]]
 
+
 def winning(state):
-    if (state[3].sum() == 36):
-        return 0
-    elif (state[3].sum() // 2 == 1):
-        return 1
+    if state[3].sum() == 36:
+        return 0    # draw
+    elif state[3].sum() // 2 == 1:
+        return 1    # black win
     else:
-        return -1
+        return -1   # black win
 
 
 def turn(state):
@@ -315,7 +317,6 @@ class Fiar(gym.Env):
         self.state_ = self.init_state()
         self.observation_space = spaces.Box(np.float32(0), np.float32(NUM_CHNLS),
                                                 shape=(NUM_CHNLS, 9, 4))
-        self.availables = list(range(36))
         self.action_space = spaces.Discrete(action_size(self.state_))
         self.done = False
         self.action = None
@@ -396,14 +397,11 @@ class Fiar(gym.Env):
         return str_(self.state_)
 
     def winner(self):
-        """
-        Get's the winner in BLACK's perspective
-        :return: 1 for black's win, -1 for white's win
-        """
-        if self.game_ended():
-            return winning(self.state_)
+        if not self.game_ended():  # 끝나지 않았으면 False 줌
+            return False, 0
         else:
-            return 0
+            return True, winning(self.state_)
+
 
 
     def reward(self):
@@ -415,7 +413,7 @@ class Fiar(gym.Env):
             self.window.close()
             self.pyglet.app.exit()
 
-    def render(self,mode='terminal'):
+    def render(self, mode='terminal'):
         if mode == 'terminal':
             print(self.__str__())
 

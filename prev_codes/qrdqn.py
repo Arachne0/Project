@@ -6,8 +6,6 @@ from torch.autograd import Variable
 import numpy as np
 
 
-
-
 def set_learning_rate(optimizer, lr):
     """Sets the learning rate to the given value"""
     for param_group in optimizer.param_groups:

@@ -44,6 +44,10 @@ _evaluate_rollout메서드 때문에 해메서 이렇게 되었음
 이 버전은 get_move, evaluate_rollout 있는 버전
 
 
+mcts 141번째 줄
+원래 코드가 1.0 if result == state.get_current_player() else -1.0 이렇게 생겨서 
+result값과 현재 player를 비교하는건데 
+일단 나는 흑일때 leaf value를 1로 주도록 설정했음
 
 
 
