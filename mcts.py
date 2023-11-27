@@ -117,7 +117,7 @@ class MCTS(object):
         the leaf and propagating it back through its parents.
         State is modified in-place, so a copy must be provided.
         """
-
+        env.reset()
         node = self._root
         while(1):
             if node.is_leaf():
@@ -140,11 +140,7 @@ class MCTS(object):
                 leaf_value = (
                     1.0 if result == 1 else -1.0
                 )
-
         node.update_recursive(-leaf_value)
-
-
-
 
     def get_move_probs(self, env, state, temp=1e-3): # state.shape = (9,4)
 

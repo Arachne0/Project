@@ -341,7 +341,7 @@ class Fiar(gym.Env):
 
         SIZE: 9,4 since it is 4x9 board
         """
-        return np.zeros((5,9,4))
+        return np.zeros((5, 9, 4))
 
     def step(self, action):
         '''
