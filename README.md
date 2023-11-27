@@ -41,7 +41,8 @@ Task : four in a row (9 x 4)
 
 내가 alphazero가 아닌 mcts_pure 코드 따라가다가
 _evaluate_rollout메서드 때문에 해메서 이렇게 되었음 
-이 버전은 evaluate_rollout 있는 버전
+이 버전은 get_move, evaluate_rollout 있는 버전
+
 
 
 
