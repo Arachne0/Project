@@ -33,18 +33,21 @@ Task : four in a row (9 x 4)
 
 ### Problem
 
-
 배치에 아직 안들어갔고, 배치에 꺼내는것도 아직 없음.
-근데 항상 reward에 -1이 들어감
 
 
-엉망진창인데 생각정리가 안되서 일단 올림
+코드가 엉망진창인데, 생각정리가 안되서 일단 올림
+
+
+내가 alphazero가 아닌 mcts_pure 코드 따라가다가
+_evaluate_rollout메서드 때문에 해메서 이렇게 되었음 
+이 버전은 evaluate_rollout 있는 버전
 
 
 
 
-
-### version
+### version  
+이건 나중에 다시 정리함
 
 black 학습, white 랜덤
 

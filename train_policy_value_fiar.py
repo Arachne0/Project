@@ -44,7 +44,7 @@ def self_play(env):
             if np.random.rand() < eps:
                 action = env.action_space.sample()
             else:
-                move, move_probs = mcts_player.get_action(obs_post)
+                move, move_probs = mcts_player.get_action(env, obs_post)
                 # 잠만 여기 좀 만져야함
                 # obs으로 안하고 env로 끝낼 수 있을거 같기도 한데 일단 돌아가게만 만들어봄
                 action = move
