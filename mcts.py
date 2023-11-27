@@ -4,6 +4,12 @@ from operator import itemgetter
 from fiar_env import action2d_ize
 
 
+def softmax(x):
+    probs = np.exp(x - np.max(x))
+    probs /= np.sum(probs)
+    return probs
+
+
 def rollout_policy_fn(board):
     """a coarse, fast version of policy_fn used in the rollout phase."""
     # rollout randomly
@@ -91,7 +97,7 @@ class TreeNode(object):
 class MCTS(object):
     """A simple implementation of Monte Carlo Tree Search."""
 
-    def __init__(self, policy_value_fn, c_puct=5, n_playout=10000):
+    def __init__(self, policy_value_fn, c_puct=5, n_playout=1000):
         """
         policy_value_fn: a function that takes in a board state and outputs
             a list of (action, probability) tuples and also a score in [-1, 1]
@@ -106,20 +112,20 @@ class MCTS(object):
         self._c_puct = c_puct
         self._n_playout = n_playout
 
-    def _playout(self, env, obs):
+    def _playout(self, env):
         """Run a single playout from the root to the leaf, getting a value at
         the leaf and propagating it back through its parents.
         State is modified in-place, so a copy must be provided.
         """
         node = self._root
-        env.reset()
+
         while(1):
             if node.is_leaf():
                 break
             # Greedily select next move.
             action, node = node.select(self._c_puct)
             obs, reward, terminated, info = env.step(action)
-        action_probs, _ = self._policy(obs)
+        action_probs, _ = self._policy(env)
 
         # Check for end of game
         result = env.winner()
@@ -131,8 +137,31 @@ class MCTS(object):
             node.expand(action_probs)
 
         # Evaluate the leaf node by random rollout
-        leaf_value = self._evaluate_rollout(env, obs)
+        leaf_value = self._evaluate_rollout(env)
         node.update_recursive(-leaf_value)
+
+
+    def get_move_probs(self, state, temp=1e-3):
+        """Run all playouts sequentially and return the available actions and
+        their corresponding probabilities.
+        state: the current game state
+        temp: temperature parameter in (0, 1] controls the level of exploration
+        """
+
+        for n in range(self._n_playout):
+            state_copy = copy.deepcopy(state)
+            self._playout(state_copy)
+
+        # calc the move probabilities based on visit counts at the root node
+        act_visits = [(act, node._n_visits)
+                      for act, node in self._root._children.items()]
+        acts, visits = zip(*act_visits)
+        act_probs = softmax(1.0/temp * np.log(np.array(visits) + 1e-10))
+
+        return acts, act_probs
+
+
+
 
     def _evaluate_rollout(self, env, obs, limit=1000):
         """Use the rollout policy to play until the end of the game,
@@ -209,9 +238,24 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
-    def get_action(self, env, board):
+    def get_action(self, board):
+
+        temp = 1e-3
+        available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
+        sensible_moves = available
+
+        # the pi vector returned by MCTS as in the alphaGo Zero paper
+        move_probs = np.zeros(len(sensible_moves))
+
+        if len(sensible_moves) > 0:
+            acts, probs = self.mcts.get_move_probs(board[3], temp)
+            move_probs[list(acts)] = probs
+
+
+
+
         if board[3].sum() < 36:
-            move = self.mcts.get_move(env, board)
+            move = self.mcts.get_move(env, board[3])
             self.mcts.update_with_move(-1)
             return move
         else:

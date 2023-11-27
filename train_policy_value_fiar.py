@@ -1,15 +1,28 @@
 from fiar_env import Fiar, turn, action2d_ize
 import numpy as np
 import wandb
+import random
 
 from collections import deque
 from mcts import MCTS, MCTSPlayer
 from model.dqn import DQN
 
 
-def self_play(env, model):
+def collect_selfplay_data(n_games=1):
 
-    won_side, mcts_probs, rewards = [], [], []
+    for i in range(n_games):
+        rewards, play_data = self_play(env)
+        # play_data에 총 3가지 데이터가 들어가야하는데
+        # states, mcts_probs, winners_z 이렇게 줌
+        # 3번째는 만약 게임이 종료 되었다면 승자를 반환함
+
+        play_data = list(play_data)[:]
+        data_buffer.extend(play_data)
+
+
+def self_play(env):
+
+    states, mcts_probs, current_player = [], [], []
     obs, _ = env.reset()
 
     players = [0, 1]
@@ -31,17 +44,34 @@ def self_play(env, model):
             if np.random.rand() < eps:
                 action = env.action_space.sample()
             else:
-                move = mcts_player.get_action(env, obs_post)
+                move, move_probs = mcts_player.get_action(obs_post)
+                # 잠만 여기 좀 만져야함
+                # obs으로 안하고 env로 끝낼 수 있을거 같기도 한데 일단 돌아가게만 만들어봄
                 action = move
+
             action2d = action2d_ize(action)
 
             if obs[3, action2d[0], action2d[1]] == 0:
                 break
-                # store the data
 
-                # won_side.append(self.board.current_state())
-                # mcts_probs.append(move_probs)
-                # rewards.append(self.board.current_player)
+            print("sex")
+            # store the data
+            states.append(board.current_state())
+            mcts_probs.append(move_probs)
+            current_player.append(self.board.current_player)
+
+            # 줘야하는건 1.states, 2.mcts_prob , 3.current player
+
+
+
+
+
+
+
+
+
+
+
 
             player_0 = turn(obs)
             player_1 = 1 - player_0
@@ -78,9 +108,21 @@ def self_play(env, model):
                     break
 
         return np.array(rewards), np.array(won_side)
+
+#일단 끝났을때 states를 반환해야함
+
+
 # 지금 그냥 rewards랑 won_side 이렇게 반환하고 있는데
 # 총 결국엔 총 4개를 반환해야함
 # reward (무승부 판별) , end state , mcts probablity, winner (흑 or 백 or 무승부)
+
+def policy_update(self):
+    """update the policy-value net"""
+    mini_batch = random.sample(data_buffer, batch_size)
+    state_batch = [data[0] for data in mini_batch]
+    mcts_probs_batch = [data[1] for data in mini_batch]
+    winner_batch = [data[2] for data in mini_batch]
+    old_probs, old_v = self.policy_value_net.policy_value(state_batch)
 
 
 
@@ -131,14 +173,21 @@ if __name__ == '__main__':
     w_win = 0
     c_puct = 5
     n_playout = 2000
+    self_play_times = 1500
+    self_play_sizes = 1
+
+    batch_size = 512
+
     mcts_player = MCTSPlayer(c_puct, n_playout)
 
-    rewards, wons = self_play(env, model)
+    for i in range(self_play_times):
+        collect_selfplay_data(self_play_sizes)
 
-    for i in range(len(rewards)):
-        data_buffer.append((rewards, wons))
-         # 여기에서 데이터 버퍼에 집어넣어놓고 그 다음에 actor-critic 하는 부분 있어야 함
-    env.reset()
+        if len(data_buffer) > batch_size:
+            loss, entropy = policy_update()
+
+             # 여기에서 데이터 버퍼에 집어넣어놓고 그 다음에 actor-critic 하는 부분 있어야 함
+        env.reset()
 
 
 
