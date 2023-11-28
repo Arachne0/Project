@@ -6,117 +6,104 @@ import random
 from collections import deque
 from mcts import MCTS, MCTSPlayer
 from model.dqn import DQN
+from actor_critic import PolicyValueNet
 
 
 def collect_selfplay_data(n_games=1):
-
     for i in range(n_games):
-        rewards, play_data = self_play(env)
-        # play_data에 총 3가지 데이터가 들어가야하는데
-        # states, mcts_probs, winners_z 이렇게 줌
-        # 3번째는 만약 게임이 종료 되었다면 승자를 반환함
-
+        rewards, play_data = self_play(env, temp=temp)
         play_data = list(play_data)[:]
         data_buffer.extend(play_data)
 
 
-def self_play(env):
+def self_play(env, temp=1e-3):
 
     states, mcts_probs, current_player = [], [], []
     obs, _ = env.reset()
 
-    players = [0, 1]
     player_0 = turn(obs)
     player_1 = 1 - player_0
 
     obs_post[0] = obs[player_0]
     obs_post[1] = obs[player_1]
     obs_post[2] = np.zeros_like(obs[0])
-    c = 0
 
     while True:
-        env.reset()
-
         while True:
+            action = None
+            move_probs = None
+
             if obs[3].sum() == 36:
                 print('draw')
-                break
-            if np.random.rand() < eps:
-                action = env.action_space.sample()
             else:
-                move, move_probs = mcts_player.get_action(env, obs_post)
-                # 잠만 여기 좀 만져야함
-                # obs으로 안하고 env로 끝낼 수 있을거 같기도 한데 일단 돌아가게만 만들어봄
+                move, move_probs = mcts_player.get_action(env, obs_post, temp=temp, return_prob=1)
                 action = move
 
             action2d = action2d_ize(action)
-
-            if obs[3, action2d[0], action2d[1]] == 0:
+            if obs[3, action2d[0], action2d[1]] == 0.0:
                 break
+        player_0 = turn(obs)
+        print(player_0)
 
-            print("sex")
-            # store the data
-            states.append(board.current_state())
-            mcts_probs.append(move_probs)
-            current_player.append(self.board.current_player)
+        # store the data
+        states.append(obs)
+        mcts_probs.append(move_probs)
+        current_player.append(turn(obs))
 
-            # 줘야하는건 1.states, 2.mcts_prob , 3.current player
-
-
-
-
+        player_0 = turn(obs)
+        print(player_0)
 
 
 
+        player_1 = 1 - player_0
 
+        print(turn(obs))
 
-
-
-
-            player_0 = turn(obs)
-            player_1 = 1 - player_0
-
-            if player_0 == 1:
-                while True:
-                    action = env.action_space.sample()
-                    action2d = action2d_ize(action)
-                    if obs[3, action2d[0], action2d[1]] == 0:
-                        break
-
-            obs, reward, terminated, info = env.step(action)
-
-            obs_post[0] = obs[player_0]
-            obs_post[1] = obs[player_1]
-            obs_post[2] = np.zeros_like(obs[0])
-
-            if terminated:
-                if obs[3].sum() == 36:
-                    print('draw')
-                    env.render()
-                obs, _ = env.reset()
-
-                # print number of steps
-                if player_0 == 1:
-                    reward *= -1
-
-                rewards.append(reward)
-                # mcts_probs()
-                won_side.append(player_0)
-
-                c += 1
-                if c == 100:
+        if player_0 == 1:
+            while True:
+                action = env.action_space.sample()
+                action2d = action2d_ize(action)
+                if obs[3, action2d[0], action2d[1]] == 0:
                     break
 
-        return np.array(rewards), np.array(won_side)
+        obs, reward, terminated, info = env.step(action)
 
-#일단 끝났을때 states를 반환해야함
+
+
+        end, winners = env.winner()
+
+        if terminated:      # 이 부분 수정해야 할 수도 있음
+            if obs[3].sum() == 36:
+                print('draw')
+                env.render()    # ?
+
+            # print number of steps
+            if player_0 == 1:
+                reward *= -1
+            print('eward')
+
+            winners_z = np.zeros(len(current_player))
+
+            if winners != 0:
+                winners_z[np.array(current_player) == winners] = 1.0
+                winners_z[np.array(current_player) != winners] = -1.0
+
+            obs, _ = env.reset()
+
+            return reward, zip(states, mcts_probs, winners_z)
+
 
 
 # 지금 그냥 rewards랑 won_side 이렇게 반환하고 있는데
 # 총 결국엔 총 4개를 반환해야함
 # reward (무승부 판별) , end state , mcts probablity, winner (흑 or 백 or 무승부)
 
+
+
 def policy_update(self):
+
+    print('이거 시작하면 80% 왔다')
+
     """update the policy-value net"""
     mini_batch = random.sample(data_buffer, batch_size)
     state_batch = [data[0] for data in mini_batch]
@@ -137,6 +124,7 @@ def policy_update(self):
 total_timesteps = 100000
 learning_starts = 1000
 eps = 0.05
+temp = 1e-3
 
 if __name__ == '__main__':
 
@@ -178,7 +166,7 @@ if __name__ == '__main__':
 
     batch_size = 512
 
-    mcts_player = MCTSPlayer(c_puct, n_playout)
+    mcts_player = MCTSPlayer(c_puct, n_playout, is_selfplay=1)
 
     for i in range(self_play_times):
         collect_selfplay_data(self_play_sizes)

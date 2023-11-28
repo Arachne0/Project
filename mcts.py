@@ -153,7 +153,6 @@ class MCTS(object):
             state_copy = copy.deepcopy(state)
             self._playout(env, state_copy)   # state_copy.shape = (5,9,4)
 
-        print('hello')
         # calc the move probabilities based on visit counts at the root node
         act_visits = [(act, node._n_visits)
                       for act, node in self._root._children.items()]
@@ -181,8 +180,9 @@ class MCTS(object):
 
 class MCTSPlayer(object):
     """AI player based on MCTS"""
-    def __init__(self, c_puct=5, n_playout=2000):
+    def __init__(self, c_puct=5, n_playout=2000, is_selfplay=0):
         self.mcts = MCTS(policy_value_fn, c_puct, n_playout)
+        self._is_selfplay = is_selfplay
 
     def set_player_ind(self, p):
         self.player = p
@@ -190,8 +190,9 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
-    def get_action(self, env, board):   # board.shape = (5,9,4)
-        temp = 1e-3
+    def get_action(self, env, board, temp=1e-3, return_prob=0):
+        # board.shape = (5,9,4)
+
         available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
         sensible_moves = available
 
@@ -201,17 +202,27 @@ class MCTSPlayer(object):
         if len(sensible_moves) > 0:
             acts, probs = self.mcts.get_move_probs(env, board, temp)
             # board.shape = (5,9,4)
-            print(probs)
-
             move_probs[list(acts)] = probs
 
+            if self._is_selfplay:
+                # add Dirichlet Noise for exploration (needed for self-play training)
+                move = np.random.choice(
+                    acts,
+                    p=0.75 * probs + 0.25 * np.random.dirichlet(0.3 * np.ones(len(probs)))
+                )
+                # update the root node and reuse the search tree
+                self.mcts.update_with_move(move)
 
-        # 차근차근 여기 밑에도 수정해야함
+            else:
+                move = np.random.choice(acts, p=probs)
 
-        if board[3].sum() < 36:
-            move = self.mcts.get_move_probs(env, board[3])
-            self.mcts.update_with_move(-1)
-            return move
+                # reset the root node
+                self.mcts.update_with_move(-1)
+
+            if return_prob:
+                return move, move_probs
+            else:
+                return move
         else:
             print("WARNING: the board is full")
 

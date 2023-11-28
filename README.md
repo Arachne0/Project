@@ -51,12 +51,7 @@ result값과 현재 player를 비교하는건데
 
 
 
-acts, probs = self.mcts.get_move_probs(env, board, temp)
-            # board.shape = (5,9,4)
-            print(probs)
-
-이 줄에서 probs가 나오게 까지 만들었음
-
+아 뭐가 문제지
 
 
 ### version  
