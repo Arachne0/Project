@@ -3,10 +3,26 @@ import numpy as np
 import wandb
 import random
 
-from collections import deque
-from mcts import MCTS, MCTSPlayer
-from model.dqn import DQN
+from collections import defaultdict, deque
+from mcts import MCTSPlayer
 from actor_critic import PolicyValueNet
+
+
+eps = 0.05
+
+batch_size = 512
+temp = 1e-3
+learn_rate = 2e-3
+lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
+
+n_playout = 400  # num of simulations for each move
+c_puct = 5
+buffer_size = 10000
+epochs = 5  # num of train_steps for each update
+kl_targ = 0.02
+check_freq = 50
+self_play_times = 1500
+best_win_ratio = 0.0
 
 
 def collect_selfplay_data(n_games=1):
@@ -42,45 +58,28 @@ def self_play(env, temp=1e-3):
             action2d = action2d_ize(action)
             if obs[3, action2d[0], action2d[1]] == 0.0:
                 break
-        player_0 = turn(obs)
-        print(player_0)
 
         # store the data
         states.append(obs)
         mcts_probs.append(move_probs)
         current_player.append(turn(obs))
 
-        player_0 = turn(obs)
-        print(player_0)
+        obs_post[0] = obs[player_0]
+        obs_post[1] = obs[player_1]
+        obs_post[2] = np.zeros_like(obs[0])
 
-
-
-        player_1 = 1 - player_0
-
-        print(turn(obs))
-
-        if player_0 == 1:
-            while True:
-                action = env.action_space.sample()
-                action2d = action2d_ize(action)
-                if obs[3, action2d[0], action2d[1]] == 0:
-                    break
-
+        print(player_0, player_1)
         obs, reward, terminated, info = env.step(action)
 
-
+        player_0 = turn(obs)
+        player_1 = 1 - player_0
 
         end, winners = env.winner()
 
-        if terminated:      # 이 부분 수정해야 할 수도 있음
+        if end:      # 이 부분 수정해야 함
             if obs[3].sum() == 36:
                 print('draw')
                 env.render()    # ?
-
-            # print number of steps
-            if player_0 == 1:
-                reward *= -1
-            print('eward')
 
             winners_z = np.zeros(len(current_player))
 
@@ -94,37 +93,68 @@ def self_play(env, temp=1e-3):
 
 
 
-# 지금 그냥 rewards랑 won_side 이렇게 반환하고 있는데
-# 총 결국엔 총 4개를 반환해야함
-# reward (무승부 판별) , end state , mcts probablity, winner (흑 or 백 or 무승부)
+def policy_update(lr_multiplier=1.0):
 
-
-
-def policy_update(self):
-
-    print('이거 시작하면 80% 왔다')
+    print('80%')
 
     """update the policy-value net"""
     mini_batch = random.sample(data_buffer, batch_size)
     state_batch = [data[0] for data in mini_batch]
     mcts_probs_batch = [data[1] for data in mini_batch]
     winner_batch = [data[2] for data in mini_batch]
-    old_probs, old_v = self.policy_value_net.policy_value(state_batch)
+    old_probs, old_v = policy_value_net.policy_value(state_batch)
+
+    for i in range(epochs):
+        loss, entropy = policy_value_net.train_step(
+            state_batch,
+            mcts_probs_batch,
+            winner_batch,
+            learn_rate * lr_multiplier)
+        new_probs, new_v = policy_value_net.policy_value(state_batch)
+        kl = np.mean(np.sum(old_probs * (
+                np.log(old_probs + 1e-10) - np.log(new_probs + 1e-10)),
+                            axis=1)
+                     )
+        if kl > kl_targ * 4:  # early stopping if D_KL diverges badly
+            break
+
+    # adaptively adjust the learning rate
+    if kl > kl_targ * 2 and lr_multiplier > 0.1:
+        lr_multiplier /= 1.5
+    elif kl < kl_targ / 2 and lr_multiplier < 10:
+        lr_multiplier *= 1.5
+
+    explained_var_old = (1 -
+                         np.var(np.array(winner_batch) - old_v.flatten()) /
+                         np.var(np.array(winner_batch)))
+    explained_var_new = (1 -
+                         np.var(np.array(winner_batch) - new_v.flatten()) /
+                         np.var(np.array(winner_batch)))
+    print(("kl:{:.5f},"
+           "lr_multiplier:{:.3f},"
+           "loss:{},"
+           "entropy:{},"
+           "explained_var_old:{:.3f},"
+           "explained_var_new:{:.3f}"
+           ).format(kl,
+                    lr_multiplier,
+                    loss,
+                    entropy,
+                    explained_var_old,
+                    explained_var_new))
+    return loss, entropy
+
+
+
+def policy_evaluate():
+
+    win_ratio = 100
+    return win_ratio
 
 
 
 
 
-
-
-
-
-
-
-total_timesteps = 100000
-learning_starts = 1000
-eps = 0.05
-temp = 1e-3
 
 if __name__ == '__main__':
 
@@ -132,25 +162,15 @@ if __name__ == '__main__':
 
     env = Fiar()
     obs, _ = env.reset()
-    buffer_size = 1000
     data_buffer = deque(maxlen=buffer_size)
+    policy_value_net = PolicyValueNet(obs.shape[1], obs.shape[2])
 
-    model = DQN("MlpPolicy", env, verbose=1, learning_starts=learning_starts)
-
-    total_timesteps, callback = model._setup_learn(
-        total_timesteps,
-        callback=None,
-        reset_num_timesteps=True,
-        tb_log_name="DQN_fiar",
-        progress_bar=True,
-    )
-
-    player_0 = turn(obs)
-    player_1 = 1 - player_0
+    turn_A = turn(obs)
+    turn_B = 1 - turn_A
 
     obs_post = obs.copy()
-    obs_post[0] = obs[player_0]
-    obs_post[1] = obs[player_1]
+    obs_post[0] = obs[turn_A]
+    obs_post[1] = obs[turn_B]
     obs_post[2] = np.zeros_like(obs[0])
     # obs_post = obs[player_myself] + obs[player_enemy]*(-1)
 
@@ -159,14 +179,10 @@ if __name__ == '__main__':
     ep = 1
     b_win = 0
     w_win = 0
-    c_puct = 5
-    n_playout = 2000
-    self_play_times = 1500
     self_play_sizes = 1
 
-    batch_size = 512
-
     mcts_player = MCTSPlayer(c_puct, n_playout, is_selfplay=1)
+
 
     for i in range(self_play_times):
         collect_selfplay_data(self_play_sizes)
@@ -174,69 +190,15 @@ if __name__ == '__main__':
         if len(data_buffer) > batch_size:
             loss, entropy = policy_update()
 
-             # 여기에서 데이터 버퍼에 집어넣어놓고 그 다음에 actor-critic 하는 부분 있어야 함
-        env.reset()
+        if (i + 1) % check_freq == 0:
+            print("current self-play batch: {}".format(i + 1))
+            win_ratio = policy_evaluate()
+            print(win_ratio)
 
 
 
 
-
-    # 그 다음에 평가하는 부분
-    while True:
-        # sample an action until a valid action is sampled
-        while True:
-            if obs[3].sum() == 36:
-                print('draw')
-                break
-            if np.random.rand() < eps:
-                action = env.action_space.sample()
-            else:
-                if player_0 == 0:  # black train version
-                    action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
-                    action = action[0]
-                else:
-                    action = env.action_space.sample()
-
-            # action = env.action_space.sample()
-            action2d = action2d_ize(action)
-
-            if obs[3, action2d[0], action2d[1]] == 0:
-                break
-
-        player_0 = turn(obs)
-        player_1 = 1 - player_0
-
-        obs, reward, terminated, info = env.step(action)
-
-        # reward = np.abs(reward)  # make them equalized for any player
-        # -1 로 reward가 들어가게되면 문제가 생기긴하지만 일단 lock
-
-        num_timesteps += 1
-
-        obs_post[0] = obs[player_0]
-        obs_post[1] = obs[player_1]
-        obs_post[2] = np.zeros_like(obs[0])
-        # obs_post = obs[player_myself] + obs[player_enemy] * (-1)
-
-        c += 1
-
-        model._store_transition(model.replay_buffer, np.array([action]), obs_post.reshape(*[1, *obs_post.shape]),
-                                np.array([reward]), np.array([terminated]), [info])
-
-        if num_timesteps > 0 and num_timesteps > learning_starts:
-            model.train(batch_size=model.batch_size, gradient_steps=1)
-
-        if terminated:
-            env.render()
-            if obs[3].sum() == 36:
-                print('draw')
-            obs, _ = env.reset()
-            # print number of steps
-            print('steps:', c)
-            print('player:{}, reward:{}'.format(player_0, reward))
-
-            if reward == 0:
-                pass
+            """
             else:
                 if player_0 == 0.0:
                     b_win += 1
@@ -259,3 +221,5 @@ if __name__ == '__main__':
             #    rewards, wons = evaluation_against_random(env, model)
                 # save model
             #    model.save("qrdqn_fiar")
+            
+            """

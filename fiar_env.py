@@ -251,8 +251,6 @@ def game_ended(state):
     :return: 0/1 = game not ended / game ended respectively
     """
     m, n = state.shape[1:]
-
-
     return int(np.count_nonzero(state[4] == 1) >= 1)
     # return int(np.count_nonzero(state[4] == 1) == m * n)
 
@@ -401,8 +399,6 @@ class Fiar(gym.Env):
             return False, 0
         else:
             return True, winning(self.state_)
-
-
 
     def reward(self):
         return self.winner()
