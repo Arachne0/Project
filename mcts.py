@@ -10,22 +10,6 @@ def softmax(x):
     return probs
 
 
-def rollout_policy_fn(board):
-    """a coarse, fast version of policy_fn used in the rollout phase."""
-    # rollout randomly
-    if board[3].sum() == 36:
-        return []
-    availables = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
-    action_probs = np.random.rand(len(availables))
-    return list(zip(availables, action_probs))
-
-
-def policy_value_fn(board):     # board.shape = (9,4)
-    # return uniform probabilities and 0 score for pure MCTS
-    availables = [i for i in range(36) if not np.any(board[3][i // 4][i % 4] == 1)]
-    action_probs = np.ones(len(availables)) / len(availables)
-    return zip(availables, action_probs), 0
-
 class TreeNode(object):
     """A node in the MCTS tree. Each node keeps track of its own value Q,
     prior probability P, and its visit-count-adjusted prior score u.
@@ -180,7 +164,7 @@ class MCTS(object):
 
 class MCTSPlayer(object):
     """AI player based on MCTS"""
-    def __init__(self, c_puct=5, n_playout=2000, is_selfplay=0):
+    def __init__(self, policy_value_fn, c_puct=5, n_playout=2000, is_selfplay=0):
         self.mcts = MCTS(policy_value_fn, c_puct, n_playout)
         self._is_selfplay = is_selfplay
 

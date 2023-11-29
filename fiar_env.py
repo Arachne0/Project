@@ -308,19 +308,13 @@ def action_size(state=None, board_size: int = None):
     return m * n
 
 class Fiar(gym.Env):
-    def __init__(self, player=0):
-        self.player = [0, 1]    # 0: black,  1: white
-        self.current_player = self.player[0]
-
+    def __init__(self):
         self.state_ = self.init_state()
         self.observation_space = spaces.Box(np.float32(0), np.float32(NUM_CHNLS),
                                                 shape=(NUM_CHNLS, 9, 4))
         self.action_space = spaces.Discrete(action_size(self.state_))
         self.done = False
         self.action = None
-        self.state_history = []
-        self.action_history = []
-        self.reward_history = []
 
 
     def init_state(self):

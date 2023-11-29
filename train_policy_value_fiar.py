@@ -43,6 +43,7 @@ def self_play(env, temp=1e-3):
     obs_post[0] = obs[player_0]
     obs_post[1] = obs[player_1]
     obs_post[2] = np.zeros_like(obs[0])
+    obs_post[3] = obs[player_0] + obs[player_1]
 
     while True:
         while True:
@@ -64,15 +65,16 @@ def self_play(env, temp=1e-3):
         mcts_probs.append(move_probs)
         current_player.append(turn(obs))
 
-        obs_post[0] = obs[player_0]
-        obs_post[1] = obs[player_1]
-        obs_post[2] = np.zeros_like(obs[0])
-
         print(player_0, player_1)
         obs, reward, terminated, info = env.step(action)
 
         player_0 = turn(obs)
         player_1 = 1 - player_0
+
+        obs_post[0] = obs[player_0]
+        obs_post[1] = obs[player_1]
+        obs_post[2] = np.zeros_like(obs[0])
+        obs_post[3] = obs[player_0] + obs[player_1]
 
         end, winners = env.winner()
 
