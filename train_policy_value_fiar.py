@@ -5,7 +5,7 @@ import random
 
 from collections import defaultdict, deque
 from mcts import MCTSPlayer
-from actor_critic import PolicyValueNet
+from policy_value_net import PolicyValueNet
 
 
 eps = 0.05
@@ -23,6 +23,15 @@ kl_targ = 0.02
 check_freq = 50
 self_play_times = 1500
 best_win_ratio = 0.0
+
+init_model=None
+
+
+def policy_value_fn(board):     # board.shape = (9,4)
+    # return uniform probabilities and 0 score for pure MCTS
+    availables = [i for i in range(36) if not np.any(board[3][i // 4][i % 4] == 1)]
+    action_probs = np.ones(len(availables)) / len(availables)
+    return zip(availables, action_probs), 0
 
 
 def collect_selfplay_data(n_games=1):
@@ -95,6 +104,11 @@ def self_play(env, temp=1e-3):
 
 
 
+
+
+
+
+
 def policy_update(lr_multiplier=1.0):
 
     print('80%')
@@ -156,8 +170,6 @@ def policy_evaluate():
 
 
 
-
-
 if __name__ == '__main__':
 
     wandb.init(project="4iar_DQN")
@@ -176,15 +188,25 @@ if __name__ == '__main__':
     obs_post[2] = np.zeros_like(obs[0])
     # obs_post = obs[player_myself] + obs[player_enemy]*(-1)
 
+    """
     c = 0
     num_timesteps = 0
     ep = 1
     b_win = 0
     w_win = 0
+    """
     self_play_sizes = 1
+    if init_model:
+        # start training from an initial policy-value net
+        policy_value_net = PolicyValueNet(env.state().shape[1],
+                                          env.state().shape[2],
+                                          model_file=init_model)
+    else:
+        # start training from a new policy-value net
+        policy_value_net = PolicyValueNet(env.state().shape[1],
+                                          env.state().shape[2])
 
-    mcts_player = MCTSPlayer(c_puct, n_playout, is_selfplay=1)
-
+    mcts_player = MCTSPlayer(policy_value_fn, c_puct, n_playout, is_selfplay=1)
 
     for i in range(self_play_times):
         collect_selfplay_data(self_play_sizes)

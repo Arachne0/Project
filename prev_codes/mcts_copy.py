@@ -1,17 +1,7 @@
 import numpy as np
 import copy
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from torch.autograd import Variable
-from policy_value_net import Net
-
-
-import torch
-
-
+from operator import itemgetter
+from fiar_env import action2d_ize
 
 
 def softmax(x):
@@ -19,20 +9,19 @@ def softmax(x):
     probs /= np.sum(probs)
     return probs
 
+def policy_value_fn(board):
 
-def policy_value_fn(board, net):
-    available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
-    current_state = np.ascontiguousarray(board.reshape(-1, 5, board.shape[1], board.shape[2]))
+    legal_positions = board.availables
+    current_state = np.ascontiguousarray(board.current_state().reshape(
+            -1, 4, self.board_width, self.board_height))
 
-    log_act_probs, value = net(torch.from_numpy(current_state).float())
+    log_act_probs, value = self.policy_value_net(
+            Variable(torch.from_numpy(current_state)).float())
 
-    # 확률을 계산할 때는 softmax 함수를 사용해야 합니다.
-    act_probs = F.softmax(log_act_probs, dim=1).data.numpy().flatten()
-    act_probs = list(zip(available, act_probs))
-
-    state_value = value.item()
-
-    return act_probs, state_value
+    act_probs = np.exp(log_act_probs.data.detach().numpy().flatten())
+    act_probs = list(zip(legal_positions, act_probs[legal_positions]))
+    value = value.data[0][0]
+    return act_probs, value
 
 
 class TreeNode(object):
@@ -134,9 +123,7 @@ class MCTS(object):
             action, node = node.select(self._c_puct)
             obs, reward, terminated, info = env.step(action)
 
-        print(obs)
-        net = Net(obs.shape[1], obs.shape[2])
-        action_probs, leaf_value = policy_value_fn(obs, net)
+        action_probs, leaf_value = policy_value_fn(obs)
 
         # Check for end of game
         end, result = env.winner()
@@ -207,8 +194,8 @@ class MCTSPlayer(object):
         if len(sensible_moves) > 0:
             acts, probs = self.mcts.get_move_probs(env, board, temp)
             # board.shape = (5,9,4)
-
             move_probs[list(acts)] = probs
+
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for self-play training)
                 move = np.random.choice(

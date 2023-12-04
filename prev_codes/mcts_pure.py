@@ -1,17 +1,7 @@
 import numpy as np
 import copy
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from torch.autograd import Variable
-from policy_value_net import Net
-
-
-import torch
-
-
+from operator import itemgetter
+from fiar_env import action2d_ize
 
 
 def softmax(x):
@@ -19,20 +9,21 @@ def softmax(x):
     probs /= np.sum(probs)
     return probs
 
+def rollout_policy_fn(board):
+    """a coarse, fast version of policy_fn used in the rollout phase."""
+    # rollout randomly
+    if board[3].sum() == 36:
+        return []
+    availables = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
+    action_probs = np.random.rand(len(availables))
+    return list(zip(availables, action_probs))
 
-def policy_value_fn(board, net):
-    available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
-    current_state = np.ascontiguousarray(board.reshape(-1, 5, board.shape[1], board.shape[2]))
 
-    log_act_probs, value = net(torch.from_numpy(current_state).float())
-
-    # 확률을 계산할 때는 softmax 함수를 사용해야 합니다.
-    act_probs = F.softmax(log_act_probs, dim=1).data.numpy().flatten()
-    act_probs = list(zip(available, act_probs))
-
-    state_value = value.item()
-
-    return act_probs, state_value
+def policy_value_fn(board):     # board.shape = (5,9,4)
+    # return uniform probabilities and 0 score for pure MCTS
+    availables = [i for i in range(36) if not np.any(board[3][i // 4][i % 4] == 1)]
+    action_probs = np.ones(len(availables)) / len(availables)
+    return zip(availables, action_probs), 0
 
 
 class TreeNode(object):
@@ -133,27 +124,40 @@ class MCTS(object):
             # Greedily select next move.
             action, node = node.select(self._c_puct)
             obs, reward, terminated, info = env.step(action)
-
-        print(obs)
-        net = Net(obs.shape[1], obs.shape[2])
-        action_probs, leaf_value = policy_value_fn(obs, net)
+        action_probs, _ = policy_value_fn(obs)
 
         # Check for end of game
         end, result = env.winner()
 
         if not end:
             node.expand(action_probs)
-        else:
-            # for end state，return the "true" leaf_value
-            if result == 0:  # tie
-                leaf_value = 0.0
-            else:
-                leaf_value = (
-                    1.0 if result == 1 else -1.0
-                )
+
+        leaf_value = self._evaluate_rollout(env, obs)
         node.update_recursive(-leaf_value)
 
-    def get_move_probs(self, env, state, temp=1e-3): # state.shape = (9,4)
+    def _evaluate_rollout(self, env, state, limit=1000):
+        """Use the rollout policy to play until the end of the game,
+        returning +1 if the current player wins, -1 if the opponent wins,
+        and 0 if it is a tie.
+        """
+        # player = env.current_player
+        for i in range(limit):
+            end, winner = env.winner()
+            if end:
+                break
+            action_probs = rollout_policy_fn(state)
+            max_action = max(action_probs, key=itemgetter(1))[0]
+            print(max_action)
+            obs, reward, terminated, info = env.step(max_action)
+        else:
+            # If no break from the loop, issue a warning.
+            print("WARNING: rollout reached move limit")
+        if winner == 0:  # tie
+            return 0
+        else:
+            return 1 if winner == 1 else -1
+
+    def get_move_probs(self, env, state, temp=1e-3):    # state.shape = (9,4)
 
         """Run all playouts sequentially and return the available actions and
         their corresponding probabilities.
@@ -207,8 +211,8 @@ class MCTSPlayer(object):
         if len(sensible_moves) > 0:
             acts, probs = self.mcts.get_move_probs(env, board, temp)
             # board.shape = (5,9,4)
-
             move_probs[list(acts)] = probs
+
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for self-play training)
                 move = np.random.choice(

@@ -125,7 +125,6 @@ def fiar_check(state, loc=False):
         else:
             return False
 
-    # check_board = np.zeros((9,4))
     def horizontal_11to4_check(state_b, loc=False):
         for offset_i in range(max(state_b.shape[1],state_b.shape[0])-1,-1,-1):
             fiar_ = 0

@@ -33,19 +33,16 @@ Task : four in a row (9 x 4)
 
 ### Problem
 
-배치에 아직 안들어갔고, 배치에 꺼내는것도 아직 없음.
+mcts.py는 alphazero mcts 따라가다가 playout부분에서 막혀서 잠시 놔둠
+문제가 생긴 줄은
+mcts 111번째 줄 부분 
 
 
-코드가 엉망진창인데, 생각정리가 안되서 일단 올림
-
-
-내가 alphazero가 아닌 mcts_pure 코드 따라가다가
-_evaluate_rollout메서드 때문에 해메서 이렇게 되었음 
+그래서 mcts_pure로 따로 만들어서 함
 이 버전은 get_move, evaluate_rollout 있는 버전
 
 
-mcts 111번째 줄
-playout 하는 부분에서 문제가 생기는 듯
+
 
 
 
