@@ -44,6 +44,7 @@ def turn(state):
     """
     return int(np.max(state[TURN_CHNL]))
 
+
 def areas(state):
     '''
     Return black area, white area
@@ -70,6 +71,7 @@ def areas(state):
             white_area += np.sum(empty_area)
 
     return black_area, white_area
+
 
 def fiar_check(state, loc=False):
     # check four in a row
@@ -244,6 +246,7 @@ def next_state(state, action1d):
 
     return state
 
+
 def game_ended(state):
     """
     :param state:
@@ -253,11 +256,13 @@ def game_ended(state):
     return int(np.count_nonzero(state[4] == 1) >= 1)
     # return int(np.count_nonzero(state[4] == 1) == m * n)
 
+
 def invalid_moves(state):
     # return a fixed size binary vector
     if game_ended(state):
         return np.zeros(action_size(state))
     return np.append(state[INVD_CHNL].flatten(), 0)
+
 
 def str_(state):
     board_str = ' '
@@ -364,7 +369,6 @@ class Fiar(gym.Env):
         self.state_ = self.init_state()
         self.done = False
         return np.copy(self.state_), {}
-
 
     def info(self):
         """

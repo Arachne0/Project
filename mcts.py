@@ -2,16 +2,9 @@ import numpy as np
 import copy
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-from torch.autograd import Variable
+
 from policy_value_net import Net
-
-
-import torch
-
-
 
 
 def softmax(x):
@@ -23,13 +16,10 @@ def softmax(x):
 def policy_value_fn(board, net):
     available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
     current_state = np.ascontiguousarray(board.reshape(-1, 5, board.shape[1], board.shape[2]))
-
     log_act_probs, value = net(torch.from_numpy(current_state).float())
 
-    # 확률을 계산할 때는 softmax 함수를 사용해야 합니다.
     act_probs = F.softmax(log_act_probs, dim=1).data.numpy().flatten()
     act_probs = list(zip(available, act_probs))
-
     state_value = value.item()
 
     return act_probs, state_value
@@ -125,7 +115,7 @@ class MCTS(object):
         the leaf and propagating it back through its parents.
         State is modified in-place, so a copy must be provided.
         """
-        # env.reset()
+        net = Net(obs.shape[1], obs.shape[2])
         node = self._root
         while(1):
             if node.is_leaf():
@@ -133,9 +123,9 @@ class MCTS(object):
             # Greedily select next move.
             action, node = node.select(self._c_puct)
             obs, reward, terminated, info = env.step(action)
+            print(action, info)
+            # whyyyyyyyyyyyyyyyyy
 
-        print(obs)
-        net = Net(obs.shape[1], obs.shape[2])
         action_probs, leaf_value = policy_value_fn(obs, net)
 
         # Check for end of game
@@ -144,6 +134,7 @@ class MCTS(object):
         if not end:
             node.expand(action_probs)
         else:
+            print(env)
             # for end state，return the "true" leaf_value
             if result == 0:  # tie
                 leaf_value = 0.0
@@ -151,6 +142,7 @@ class MCTS(object):
                 leaf_value = (
                     1.0 if result == 1 else -1.0
                 )
+            obs, _ = env.reset()
         node.update_recursive(-leaf_value)
 
     def get_move_probs(self, env, state, temp=1e-3): # state.shape = (9,4)
@@ -164,6 +156,7 @@ class MCTS(object):
             state_copy = copy.deepcopy(state)
             self._playout(env, state_copy)   # state_copy.shape = (5,9,4)
 
+        print('hello')
         # calc the move probabilities based on visit counts at the root node
         act_visits = [(act, node._n_visits)
                       for act, node in self._root._children.items()]

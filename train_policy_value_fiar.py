@@ -77,6 +77,9 @@ def self_play(env, temp=1e-3):
         print(player_0, player_1)
         obs, reward, terminated, info = env.step(action)
 
+        print("hello")
+
+
         player_0 = turn(obs)
         player_1 = 1 - player_0
 
@@ -88,17 +91,20 @@ def self_play(env, temp=1e-3):
         end, winners = env.winner()
 
         if end:      # 이 부분 수정해야 함
+            env.reset()
+
+            # reset MCTS root node
+            mcts_player.reset_player()
+
             if obs[3].sum() == 36:
                 print('draw')
-                env.render()    # ?
+                env.render()
 
             winners_z = np.zeros(len(current_player))
 
             if winners != 0:
                 winners_z[np.array(current_player) == winners] = 1.0
                 winners_z[np.array(current_player) != winners] = -1.0
-
-            obs, _ = env.reset()
 
             return reward, zip(states, mcts_probs, winners_z)
 
@@ -196,6 +202,7 @@ if __name__ == '__main__':
     w_win = 0
     """
     self_play_sizes = 1
+
     if init_model:
         # start training from an initial policy-value net
         policy_value_net = PolicyValueNet(env.state().shape[1],

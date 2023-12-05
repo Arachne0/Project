@@ -33,16 +33,10 @@ Task : four in a row (9 x 4)
 
 ### Problem
 
-mcts.py는 alphazero mcts 따라가다가 playout부분에서 막혀서 잠시 놔둠
-문제가 생긴 줄은
-mcts 111번째 줄 부분 
-
-
-그래서 mcts_pure로 따로 만들어서 함
-이 버전은 get_move, evaluate_rollout 있는 버전
-
-
-
+문제가 생김 
+첫 _playout은 잘 돌아감 
+근데 다음 _playout은 turn이 안넘어가는건지 action이 같은게 뽑힘 
+분명 state 초기화 되어 들어가는데 왜 그러니
 
 
 
