@@ -46,6 +46,7 @@ class TreeNode(object):
         for action, prob in action_priors:
             if action not in self._children:
                 self._children[action] = TreeNode(self, prob)
+                # print(self._children.items())
 
     def select(self, c_puct):
         """Select action among children that gives maximum action value Q
@@ -55,10 +56,10 @@ class TreeNode(object):
         action, i_node = max(self._children.items(),
                                 key=lambda act_node: act_node[1].get_value(c_puct))
         # Remove the selected child from the children dictionary
-        removed_child = self._children.pop(action)
-        # Store the removed child in a list
-        self._removed_children.append((action, removed_child))
+        self._children.pop(action)
 
+        # Store the removed child in a list
+        self._removed_children.append(action)
         return action, i_node
 
     def update(self, leaf_value):
@@ -99,10 +100,11 @@ class TreeNode(object):
 
     def leaf_reset(self):
         # Reinsert the removed children after the game is finished
-        for action, child in self._removed_children:
-            self._children[action] = child
+        for action in self._removed_children:
+            # Assuming _removed_children contains only actions
+            self._children[action] = None  # You can replace None with an appropriate default value
 
-        # Clear the list of removed children for the next game
+            # Clear the list of removed actions for the next game
         self._removed_children = []
 
 
@@ -140,14 +142,12 @@ class MCTS(object):
                 break
             # Greedily select next move.
             action, node = node.select(self._c_puct)
-            print(action) # 여기랑
-            obs, reward, terminated, info = env.step(action)
 
+            obs, reward, terminated, info = env.step(action)
         action_probs, leaf_value = policy_value_fn(obs, net)
 
         # Check for end of game
         end, result = env.winner()
-        # print(end, result, obs[2].sum()) # 여기
 
         if not end:
             node.expand(action_probs)
@@ -160,13 +160,14 @@ class MCTS(object):
                 leaf_value = (
                     1.0 if result == 1 else -1.0
                 )
-            node.leaf_reset()
-            self.update_with_move(-1)
+
             obs, _ = env.reset()
+            self.update_with_move(-1)
+            node.leaf_reset()
 
         node.update_recursive(-leaf_value)
 
-    def get_move_probs(self, env, state, temp=1e-3): # state.shape = (9,4)
+    def get_move_probs(self, env, state, temp=1e-3): # state.shape = (5,9,4)
 
         """Run all playouts sequentially and return the available actions and
         their corresponding probabilities.
@@ -177,7 +178,7 @@ class MCTS(object):
             state_copy = copy.deepcopy(state)
             self._playout(env, state_copy)   # state_copy.shape = (5,9,4)
 
-        print('hello')
+        print('제발')
         # calc the move probabilities based on visit counts at the root node
         act_visits = [(act, node._n_visits)
                       for act, node in self._root._children.items()]
@@ -218,7 +219,6 @@ class MCTSPlayer(object):
         # the pi vector returned by MCTS as in the alphaGo Zero paper
         move_probs = np.zeros(len(sensible_moves))
 
-        print("여기까지 돌아감")
         if len(sensible_moves) > 0:
             acts, probs = self.mcts.get_move_probs(env, board, temp)    # board.shape = (5,9,4)
 

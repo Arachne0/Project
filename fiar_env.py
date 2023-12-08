@@ -31,10 +31,10 @@ def action1d_ize(action):
 def winning(state):
     if state[3].sum() == 36:
         return 0    # draw
-    elif state[3].sum() // 2 == 1:
+    elif state[3].sum() % 2 == 1:
         return 1    # black win
     else:
-        return -1   # black win
+        return -1   # white win
 
 
 def turn(state):
