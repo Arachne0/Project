@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.autograd import Variable
 import numpy as np
 
 
@@ -45,7 +44,7 @@ class Net(nn.Module):
 
         # state value layers
         x_val = F.relu(self.val_fc1(x))
-        state_value = torch.tanh(self.val_fc2(x_val))
+        state_value = torch.tanh(self.val_fc2(x_val)).squeeze()  # Fix here
 
         return action_probs, state_value
 
@@ -77,52 +76,23 @@ class PolicyValueNet():
         """
         if self.use_gpu:
             state_batch_np = np.array(state_batch)
-            state_batch = Variable(torch.FloatTensor(state_batch_np).cuda())
+            state_batch = torch.FloatTensor(state_batch_np).cuda()
             log_act_probs, value = self.policy_value_net(state_batch)
             act_probs = np.exp(log_act_probs.data.cpu().numpy())
             return act_probs, value.item()
         else:
             state_batch_np = np.array(state_batch)
-            state_batch = Variable(torch.FloatTensor(state_batch_np))
+            state_batch = torch.FloatTensor(state_batch_np)
             log_act_probs, value = self.policy_value_net(state_batch)
             act_probs = np.exp(log_act_probs.data.numpy())
-            return act_probs, value.item()
-
-    def policy_value_fn(self, board):
-
-        legal_positions = board.availables
-        print(legal_positions)
-        current_state = np.ascontiguousarray(board.current_state().reshape(
-            -1, 4, self.board_width, self.board_height))
-
-        log_act_probs, value = self.policy_value_net(
-            Variable(torch.from_numpy(current_state)).float())
-
-        act_probs = np.exp(log_act_probs.data.detach().numpy().flatten())
-        act_probs = list(zip(legal_positions, act_probs[legal_positions]))
-        value = value.item()
-        return act_probs, value
+            return act_probs, value.detach().cpu().numpy()
 
     def train_step(self, state_batch, mcts_probs, winner_batch, lr):
         """perform a training step"""
-        # wrap in Variable
-        if self.use_gpu:
-            state_batch_np = np.array(state_batch)
-            mcts_probs_np = np.array(mcts_probs)
-            winner_batch_np = np.array(winner_batch)
-
-            state_batch = Variable(torch.FloatTensor(state_batch_np).cuda())
-            mcts_probs = Variable(torch.FloatTensor(mcts_probs_np).cuda())
-            winner_batch = Variable(torch.FloatTensor(winner_batch_np).cuda())
-
-        else:
-            state_batch_np = np.array(state_batch)
-            mcts_probs_np = np.array(mcts_probs)
-            winner_batch_np = np.array(winner_batch)
-
-            state_batch = Variable(torch.FloatTensor(state_batch_np))
-            mcts_probs = Variable(torch.FloatTensor(mcts_probs_np))
-            winner_batch = Variable(torch.FloatTensor(winner_batch_np))
+        # wrap in Tensor
+        state_batch = torch.FloatTensor(np.array(state_batch))
+        mcts_probs = torch.FloatTensor(np.array(mcts_probs))
+        winner_batch = torch.FloatTensor(np.array(winner_batch))
 
         # zero the parameter gradients
         self.optimizer.zero_grad()
@@ -131,18 +101,21 @@ class PolicyValueNet():
 
         # forward
         log_act_probs, value = self.policy_value_net(state_batch)
+
         # define the loss = (z - v)^2 - pi^T * log(p) + c||theta||^2
         # Note: the L2 penalty is incorporated in optimizer
         value_loss = F.mse_loss(value.view(-1), winner_batch)
-        policy_loss = -torch.mean(torch.sum(mcts_probs*log_act_probs, 1))
+        policy_loss = -torch.mean(torch.sum(mcts_probs * log_act_probs, 1))
         loss = value_loss + policy_loss
+
         # backward and optimize
         loss.backward()
         self.optimizer.step()
+
         # calc policy entropy, for monitoring only
         entropy = -torch.mean(
-                torch.sum(torch.exp(log_act_probs) * log_act_probs, 1)
-                )
+            torch.sum(torch.exp(log_act_probs) * log_act_probs, 1)
+        )
         return loss.item(), entropy.item()
 
     def get_policy_param(self):

@@ -1,38 +1,33 @@
 import numpy as np
 import copy
-
-import torch
-import torch.nn.functional as F
-
-from gym_4iar_indev.policy_value.policy_value_network import Net
+from operator import itemgetter
 
 
-def softmax(x):
-    probs = np.exp(x - np.max(x))
-    probs /= np.sum(probs)
-    return probs
-
-
-def policy_value_fn(board, net):
+def rollout_policy_fn(board):
+    """a coarse, fast version of policy_fn used in the rollout phase."""
+    # rollout randomly
     available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
-    current_state = np.ascontiguousarray(board.reshape(-1, 5, board.shape[1], board.shape[2]))
-    log_act_probs, value = net(torch.from_numpy(current_state).float())
+    action_probs = np.random.rand(len(available))
+    return zip(available, action_probs)
 
-    act_probs = F.softmax(log_act_probs, dim=1).data.numpy().flatten()
-    act_probs = list(zip(available, act_probs))
-    state_value = value.item()
 
-    return act_probs, state_value
+def policy_value_fn(board):
+    """a function that takes in a state and outputs a list of (action, probability)
+    tuples and a score for the state"""
+    # return uniform probabilities and 0 score for pure MCTS
+    available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
+    action_probs = np.ones(len(available))/len(available)
+    return zip(available, action_probs), 0
 
 
 class TreeNode(object):
     """A node in the MCTS tree. Each node keeps track of its own value Q,
     prior probability P, and its visit-count-adjusted prior score u.
     """
+
     def __init__(self, parent, prior_p):
         self._parent = parent
         self._children = {}  # a map from action to TreeNode
-        self._removed_children = []
         self._n_visits = 0
         self._Q = 0
         self._u = 0
@@ -53,7 +48,7 @@ class TreeNode(object):
         Return: A tuple of (action, next_node)
         """
         action, i_node = max(self._children.items(),
-                                key=lambda act_node: act_node[1].get_value(c_puct))
+                             key=lambda act_node: act_node[1].get_value(c_puct))
         if self._children == {}:
             print('empty')
         return action, i_node
@@ -88,7 +83,8 @@ class TreeNode(object):
         return self._Q + self._u
 
     def is_leaf(self):
-        """Check if leaf node (i.e. no nodes below this have been expanded)."""
+        """Check if leaf node (i.e. no nodes below this have been expanded).
+        """
         return self._children == {}
 
     def is_root(self):
@@ -98,7 +94,7 @@ class TreeNode(object):
 class MCTS(object):
     """A simple implementation of Monte Carlo Tree Search."""
 
-    def __init__(self, policy_value_fn, c_puct=5, n_playout=1000):
+    def __init__(self, policy_value_fn, c_puct=5, n_playout=10000):
         """
         policy_value_fn: a function that takes in a board state and outputs
             a list of (action, probability) tuples and also a score in [-1, 1]
@@ -113,64 +109,64 @@ class MCTS(object):
         self._c_puct = c_puct
         self._n_playout = n_playout
 
-    def _playout(self, env, obs):   # obs.shape = (5,9,4)
+    def _playout(self, env, obs):
         """Run a single playout from the root to the leaf, getting a value at
         the leaf and propagating it back through its parents.
         State is modified in-place, so a copy must be provided.
         """
-        net = Net(obs.shape[1], obs.shape[2])
         node = self._root
-
-        if np.any(env.state_[3] != obs[3]):
-            pass
-            # print('wtf')
-
         while(1):
             if node.is_leaf():
                 break
             # Greedily select next move.
             action, node = node.select(self._c_puct)
-            # print('move')
-            obs, reward, terminated, info = env.step(action, node)
-        action_probs, leaf_value = policy_value_fn(obs, net)
+            obs, reward, terminated, info = env.step(action,node)
+        action_probs, _ = self._policy(state)
 
         # Check for end of game
         end, result = env.winner()
 
         if not end:
             node.expand(action_probs)
-        else:
-            # for end state，return the "true" leaf_value
-            if result == -1:  # tie
-                leaf_value = 0.0
-            else:
-                leaf_value = (
-                    1.0 if result == 0 else -1.0
-                )
 
-            obs, _ = env.reset()
-            # print('reset_done')
-
-        # print('end_one_playout')
+        # Evaluate the leaf node by random rollout
+        leaf_value = self._evaluate_rollout(env, obs)
+        # Update value and visit count of nodes in this traversal.
         node.update_recursive(-leaf_value)
 
-    def get_move_probs(self, env, state, temp=1e-3): # state.shape = (5,9,4)
+    def _evaluate_rollout(self, env, state, limit=1000):
+        """Use the rollout policy to play until the end of the game,
+        returning +1 if the current player wins, -1 if the opponent wins,
+        and 0 if it is a tie.
+        """
+        player = state.get_current_player()
+        for i in range(limit):
+            end, winner = env.game_end()
+            if end:
+                break
+            action_probs = rollout_policy_fn(state)
+            max_action = max(action_probs, key=itemgetter(1))[0]
+            obs, reward, terminated, info = env.step(max_action)
 
-        """Run all playouts sequentially and return the available actions and
-        their corresponding probabilities.
+        else:
+            # If no break from the loop, issue a warning.
+            print("WARNING: rollout reached move limit")
+
+        if winner == -1:  # tie
+            return 0
+        else:
+            return 1 if winner == player else -1
+
+    def get_move(self, env, state):
+        """Runs all playouts sequentially and returns the most visited action.
         state: the current game state
-        temp: temperature parameter in (0, 1] controls the level of exploration
+
+        Return: the selected action
         """
         for n in range(self._n_playout):
-            self._playout(copy.deepcopy(env), copy.deepcopy(state))   # state_copy.shape = (5,9,4)
-
-        # calc the move probabilities based on visit counts at the root node
-        act_visits = [(act, node._n_visits)
-                      for act, node in self._root._children.items()]
-        acts, visits = zip(*act_visits)
-        act_probs = softmax(1.0/temp * np.log(np.array(visits) + 1e-10))
-
-        return acts, act_probs
+            self._playout(copy.deepcopy(env), copy.deepcopy(state))
+        return max(self._root._children.items(),
+                   key=lambda act_node: act_node[1]._n_visits)[0]
 
     def update_with_move(self, last_move):
         """Step forward in the tree, keeping everything we already know
@@ -188,9 +184,8 @@ class MCTS(object):
 
 class MCTSPlayer(object):
     """AI player based on MCTS"""
-    def __init__(self, policy_value_fn, c_puct=5, n_playout=2000, is_selfplay=0):
+    def __init__(self, c_puct=5, n_playout=2000):
         self.mcts = MCTS(policy_value_fn, c_puct, n_playout)
-        self._is_selfplay = is_selfplay
 
     def set_player_ind(self, p):
         self.player = p
@@ -198,34 +193,14 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
-    def get_action(self, env, board, temp=1e-3, return_prob=0):  # board.shape = (5,9,4)
+    def get_action(self, env, board):
         available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
         sensible_moves = available
-        # the pi vector returned by MCTS as in the alphaGo Zero paper
-        move_probs = np.zeros(board.shape[1] * board.shape[2])
 
         if len(sensible_moves) > 0:
-            acts, probs = self.mcts.get_move_probs(env, board, temp)    # board.shape = (5,9,4)
-            move_probs[list(acts)] = probs
-
-            if self._is_selfplay:
-                # add Dirichlet Noise for exploration (needed for self-play training)
-                move = np.random.choice(
-                    acts,
-                    p=0.75 * probs + 0.25 * np.random.dirichlet(0.3 * np.ones(len(probs)))
-                )
-                # update the root node and reuse the search tree
-                self.mcts.update_with_move(move)
-
-            else:
-                move = np.random.choice(acts, p=probs)
-                # reset the root node
-                self.mcts.update_with_move(-1)
-
-            if return_prob:
-                return move, move_probs
-            else:
-                return move
+            move = self.mcts.get_move(env, board)
+            self.mcts.update_with_move(-1)
+            return move
         else:
             print("WARNING: the board is full")
 
