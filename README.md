@@ -32,6 +32,7 @@ Task : four in a row (9 x 4)
 
 추가해야할건 루트 노드가 뭔지 나오게한다면 좋을거 같다고 하심
 
+dqn에서는 num_actions을 어떻게 줘야할지 잘 모르겠음
 
 
 ## version  
