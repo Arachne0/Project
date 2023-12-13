@@ -1,8 +1,9 @@
 import numpy as np
 import copy
-import torch
 
-from torch import nn
+import torch
+import torch.nn.functional as F
+
 from Project.policy_value.policy_value_network import Net
 
 
@@ -17,8 +18,7 @@ def policy_value_fn(board, net):
     current_state = np.ascontiguousarray(board.reshape(-1, 5, board.shape[1], board.shape[2]))
     log_act_probs, value = net(torch.from_numpy(current_state).float())
 
-    act_probs = nn.functional.softmax(
-        log_act_probs, dim=1).detach().numpy().flatten()
+    act_probs = F.softmax(log_act_probs, dim=1).data.numpy().flatten()
     act_probs = list(zip(available, act_probs))
     state_value = value.item()
 
@@ -121,17 +121,16 @@ class MCTS(object):
         net = Net(obs.shape[1], obs.shape[2])
         node = self._root
 
-        if np.any(env.state_[3] != obs[3]):
-            pass
-            # print('wtf')
-
         while(1):
             if node.is_leaf():
                 break
             # Greedily select next move.
             action, node = node.select(self._c_puct)
-            # print('move')
             obs, reward, terminated, info = env.step(action, node)
+
+        if np.any(env.state_[3] != obs[3]):
+            print('wtf')
+
         action_probs, leaf_value = policy_value_fn(obs, net)
 
         # Check for end of game
@@ -161,7 +160,7 @@ class MCTS(object):
         state: the current game state
         temp: temperature parameter in (0, 1] controls the level of exploration
         """
-        for n in range(self._n_playout):
+        for n in range(self._n_playout):  # for 400 times
             self._playout(copy.deepcopy(env), copy.deepcopy(state))   # state_copy.shape = (5,9,4)
 
         # calc the move probabilities based on visit counts at the root node
