@@ -4,7 +4,7 @@ import gymnasium as gym
 from gymnasium import spaces
 from scipy import ndimage
 
-from Project import state_utils
+from gym_4iar_indev import state_utils
 # from numpy.random import choice_
 
 BLACK = 0
