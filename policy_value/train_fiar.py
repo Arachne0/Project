@@ -1,11 +1,11 @@
-from gym_4iar_indev.fiar_env import Fiar, turn, action2d_ize
 import numpy as np
 import wandb
 import random
 
+from Project.fiar_env import Fiar, turn, action2d_ize
 from collections import defaultdict, deque
-from gym_4iar_indev.mcts import MCTSPlayer
-from gym_4iar_indev.mcts_pure import MCTSPlayer as MCTS_Pure
+from Project.mcts import MCTSPlayer
+from Project.mcts_pure import MCTSPlayer as MCTS_Pure
 from policy_value_network import PolicyValueNet
 # from policy_value_network_mlp import PolicyValueNet
 
@@ -30,7 +30,7 @@ lr_multiplier = 1.0     # adaptively adjust the learning rate based on KL
 check_freq = 50  # previous 50
 best_win_ratio = 0.0
 
-kl_targ = 0.05  # previous 0.02
+kl_targ = 0.02  # previous 0.02
 
 
 init_model = None
@@ -43,10 +43,26 @@ def policy_value_fn(board):  # board.shape = (9,4)
     return zip(availables, action_probs), 0
 
 
+def get_equi_data(env, play_data):
+    """augment the data set by flipping
+    play_data: [(state, mcts_prob, winner_z), ..., ...]
+    """
+    extend_data = []
+    for state, mcts_prob, winner in play_data:
+        # flip horizontally
+        equi_state = np.array([np.fliplr(s) for s in state])
+        equi_mcts_prob = np.fliplr(mcts_prob.reshape(env.state().shape[1], env.state().shape[2]))
+        extend_data.append((equi_state,
+                            np.flipud(equi_mcts_prob).flatten(),
+                            winner))
+    return extend_data
+
+
 def collect_selfplay_data(n_games=1):
     for i in range(n_games):
         rewards, play_data = self_play(env, temp=temp)
         play_data = list(play_data)[:]
+        play_data = get_equi_data(env, play_data)
         data_buffer.extend(play_data)
 
 
@@ -100,14 +116,11 @@ def self_play(env, temp=1e-3):
                 print('draw')
 
             print(env)
-            obs, _ = env.reset()
 
-            if np.any(env.state_[3] != obs[3]):
-                print("따이")
+            obs, _ = env.reset()
 
             # reset MCTS root node
             mcts_player.reset_player()
-
             print("batch i:{}, episode_len:{}".format(
                 i + 1, len(current_player)))
             winners_z = np.zeros(len(current_player))
@@ -215,7 +228,6 @@ def start_play(env, player1, player2):
     current_player = 0
 
     while True:
-
         player_in_turn = players[current_player]
         move = player_in_turn.get_action(env, obs)
         obs, reward, terminated, info = env.step(move)
@@ -248,6 +260,7 @@ if __name__ == '__main__':
     obs_post[0] = obs[turn_A]
     obs_post[1] = obs[turn_B]
     obs_post[2] = np.zeros_like(obs[0])
+    obs_post[3] = obs[turn_A] + obs[turn_B]
 
     if init_model:
         # start training from an initial policy-value net

@@ -68,6 +68,7 @@ class PolicyValueNet():
                                     weight_decay=self.l2_const)
 
         if model_file:
+            print("도레미파솔라시도")
             net_params = torch.load(model_file)
             self.policy_value_net.load_state_dict(net_params)
 
@@ -92,7 +93,7 @@ class PolicyValueNet():
     def policy_value_fn(self, board):
         """
         input: board
-        output: a list of (action, probability) tuples fㅌor each available
+        output: a list of (action, probability) tuples for each available
         action and the score of the board state
         """
         legal_positions = board.availables
@@ -140,7 +141,7 @@ class PolicyValueNet():
         # define the loss = (z - v)^2 - pi^T * log(p) + c||theta||^2
         # Note: the L2 penalty is incorporated in optimizer
         value_loss = F.mse_loss(value.view(-1), winner_batch)
-        policy_loss = -torch.mean(torch.sum(mcts_probs*log_act_probs, 1))
+        policy_loss = -torch.mean(torch.sum(mcts_probs * log_act_probs, 1))
         loss = value_loss + policy_loss
         # backward and optimize
         loss.backward()
