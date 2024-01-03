@@ -3,7 +3,8 @@ import wandb
 
 from Project.fiar_env import Fiar, turn, action2d_ize
 from collections import deque
-from Project.mcts import MCTSPlayer
+from Project.dqn.dqn_mcts import MCTSPlayer
+from Project.dqn.dqn_mcts_pure import MCTSPlayer as MCTS_Pure
 from Project.model.dqn import DQN
 
 
@@ -14,7 +15,7 @@ n_playout = 400  # previous 400
 
 self_play_sizes = 1
 temp = 1e-3
-buffer_size = 10000
+
 epochs = 5  # num of train_steps for each update
 self_play_times = 1000   # previous 1500
 pure_mcts_playout_num = 500     # previous 1000
@@ -31,12 +32,32 @@ kl_targ = 0.02  # previous 0.02
 
 
 # dqn parameter
+buffer_size = 10000
+
+
 total_timesteps = 100000
 learning_starts = 1000
 eps = 0.05
 
 
 init_model = None
+
+
+class ReplayBuffer:
+    def __init__(self, buffer_size):
+        self.buffer_size = buffer_size
+        self.buffer = deque(maxlen=buffer_size)
+
+    def add(self, state, action, reward, next_state, done):
+        transition = (state, action, reward, next_state, done)
+        self.buffer.append(transition)
+
+    def sample(self, batch_size):
+        batch = np.random.sample(self.buffer, batch_size)
+        return batch
+
+    def __len__(self):
+        return len(self.buffer)
 
 
 def collect_selfplay_data(n_games=1):
@@ -67,52 +88,60 @@ def self_play(env, model, temp=1e-3):
             else:
                 move, move_probs = mcts_player.get_action(env, obs_post, temp=temp, return_prob=1)
                 action = move
-                # action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
-                # action = action[0]
-
-            # action = env.action_space.sample()
             action2d = action2d_ize(action)
 
             if obs[3, action2d[0], action2d[1]] == 0:
                 break
 
+        # [Todo] 지난번처럼 copy한 state랑 현재 state가 다르게 들어갈수도
+        states.append(obs_post.copy())
+        mcts_probs.append(move_probs)
+        current_player.append(player_0)
+
+        print(action)
+
+        obs, reward, terminated, info = env.step(action)
+
         player_0 = turn(obs)
         player_1 = 1 - player_0
-
-        if player_0 == 1:
-            while True:
-                action = env.action_space.sample()
-                action2d = action2d_ize(action)
-                if obs[3, action2d[0], action2d[1]] == 0:
-                    break
-        obs, reward, terminated, info = env.step(action)
 
         obs_post[0] = obs[player_0]
         obs_post[1] = obs[player_1]
         obs_post[2] = np.zeros_like(obs[0])
+        obs_post[3] = obs[player_0] + obs[player_1]
 
-        if terminated:
+        next_states = obs_post.copy()
+
+        replay_buffer.add(obs_post, action, reward, next_states, terminated)
+
+        end, winners = env.winner()
+
+        if end:
             if obs[3].sum() == 36:
                 print('draw')
-                env.render()
+
+            print(env)
             obs, _ = env.reset()
 
-            # print number of steps
-            if player_0 == 1:
-                reward *= -1
+            # reset MCTS root node
+            mcts_player.reset_player()
+            print("batch i:{}, episode_len:{}".format(
+                i + 1, len(current_player)))
+            winners_z = np.zeros(len(current_player))
 
-            rewards.append(reward)
-            # mcts_probs()
-            won_side.append(player_0)
+            if len(replay_buffer) > batch_size:
+                batch = replay_buffer.sample(batch_size)
+                model.train(batch)
+                # model.train(batch_size=model.batch_size, gradient_steps=1)
 
-            c += 1
-            if c == 100:
-                break
+            if winners != -1:
+                if winners == -0.5:  # if win white return : 0.1
+                    winners = 0
+                winners_z[np.array(current_player) == 1 - winners] = 1.0
+                winners_z[np.array(current_player) != 1 - winners] = -1.0
+            return reward, zip(states, mcts_probs, winners_z)
 
-    return np.array(rewards), np.array(won_side)
-# 지금 그냥 rewards랑 won_side 이렇게 반환하고 있는데
-# 총 결국엔 총 4개를 반환해야함
-# reward (무승부 판별) , end state , mcts probablity, winner (흑 or 백 or 무승부)
+
 
 
 
@@ -135,7 +164,7 @@ if __name__ == '__main__':
     obs, _ = env.reset()
     data_buffer = deque(maxlen=buffer_size)
 
-    model = DQN("CNNPolicy", env, verbose=1, learning_starts=learning_starts)
+    model = DQN("MlpPolicy", env, verbose=1, learning_starts=learning_starts)
 
     total_timesteps, callback = model._setup_learn(
         total_timesteps,
@@ -155,10 +184,12 @@ if __name__ == '__main__':
     obs_post[3] = obs[turn_A] + obs[turn_B]
 
     mcts_player = MCTSPlayer(c_puct, n_playout)
+    replay_buffer = ReplayBuffer(buffer_size)
 
     try:
         for i in range(self_play_times):
-            collect_selfplay_data(self_play_sizes, model)
+            collect_selfplay_data(self_play_sizes)
+            print("1")
 
 
         for i in range(len(rewards)):
@@ -212,34 +243,13 @@ if __name__ == '__main__':
             model._store_transition(model.replay_buffer, np.array([action]), obs_post.reshape(*[1, *obs_post.shape]),
                                     np.array([reward]), np.array([terminated]), [info])
 
-            if num_timesteps > 0 and num_timesteps > learning_starts:
-                model.train(batch_size=model.batch_size, gradient_steps=1)
+            # if num_timesteps > 0 and num_timesteps > learning_starts:
+            #     model.train(batch_size=model.batch_size, gradient_steps=1)
 
             if terminated:
-                env.render()
-                if obs[3].sum() == 36:
-                    print('draw')
-                obs, _ = env.reset()
-                # print number of steps
-                print('steps:', c)
-                print('player:{}, reward:{}'.format(player_0, reward))
+                print("1234123")
 
-                if reward == 0:
-                    pass
-                else:
-                    if player_0 == 0.0:
-                        b_win += 1
-                    elif player_0 == 1.0:
-                        w_win += 1
+    except KeyboardInterrupt:
+        print('\n\rquit')
 
-                b_wins = b_win / ep
-                w_wins = w_win / ep
-
-                print({"episode ": ep, "black win (%)": round(b_wins, 5) * 100, "white win (%)": round(w_wins, 5) * 100,
-                      "black wins time": b_win,"white wins time": w_win, "tie time": ep - b_win - w_win})
-                print('\n\n')
-                # 나중에 이부분 round로 나두지말고 format으로 처리해서 부동소수점 문제 처리
-
-                c = 0
-                ep += 1
 

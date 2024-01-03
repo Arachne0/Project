@@ -186,7 +186,9 @@ def fiar_check(state, loc=False):
             return False
 
     if loc is False:
-        return 1 if np.any([horizontal_check(state), vertical_check(state), horizontal_11to4_check(state),
+        return 1 if np.any([horizontal_check(state),
+                            vertical_check(state),
+                            horizontal_11to4_check(state),
                             horizontal_1to7_check(state), ]) else 0
     else:
         switch, locset = vertical_check(state, loc=True)

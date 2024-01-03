@@ -38,7 +38,6 @@ class DQN(nn.Module):
 
 
 
-
 class DQNNet():
     """policy-value network """
     def __init__(self, board_width, board_height,

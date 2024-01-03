@@ -4,7 +4,7 @@ import copy
 import torch
 import torch.nn.functional as F
 
-from Project.dqn.dqn_network import DQN
+from Project.prev_codes.dqn_network import DQN
 
 
 def softmax(x):
@@ -118,7 +118,7 @@ class MCTS(object):
         the leaf and propagating it back through its parents.
         State is modified in-place, so a copy must be provided.
         """
-        net = DQN(obs.shape[1], obs.shape[2])
+        net = DQN(obs.shape[1], obs.shape[2], obs.shape[1]*obs.shape[2])
         node = self._root
 
         while(1):

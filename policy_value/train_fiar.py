@@ -116,7 +116,6 @@ def self_play(env, temp=1e-3):
                 print('draw')
 
             print(env)
-
             obs, _ = env.reset()
 
             # reset MCTS root node

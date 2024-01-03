@@ -68,7 +68,6 @@ class PolicyValueNet():
                                     weight_decay=self.l2_const)
 
         if model_file:
-            print("도레미파솔라시도")
             net_params = torch.load(model_file)
             self.policy_value_net.load_state_dict(net_params)
 
@@ -104,8 +103,6 @@ class PolicyValueNet():
                 Variable(torch.from_numpy(current_state)).float())
 
         act_probs = np.exp(log_act_probs.data.detach().numpy().flatten())
-
-        print(act_probs)
         act_probs = list(zip(legal_positions, act_probs[legal_positions]))
         value = value.data[0][0]
         return act_probs, value
