@@ -25,7 +25,7 @@ batch_size = 64  # previous 512
 learn_rate = 2e-3
 lr_mul = 1.0
 lr_multiplier = 1.0     # adaptively adjust the learning rate based on KL
-check_freq = 50  # previous 50
+check_freq = 1  # previous 50
 best_win_ratio = 0.0
 
 kl_targ = 0.02  # previous 0.02
@@ -62,12 +62,12 @@ class ReplayBuffer:
 
 def collect_selfplay_data(n_games=1):
     for i in range(n_games):
-        rewards, play_data = self_play(env, model, temp=temp)
+        rewards, play_data = self_play(env, temp=temp)
         play_data = list(play_data)[:]
         data_buffer.extend(play_data)
 
 
-def self_play(env, model, temp=1e-3):
+def self_play(env, temp=1e-3):
     states, mcts_probs, current_player = [], [], []
     obs, _ = env.reset()
 
@@ -111,8 +111,9 @@ def self_play(env, model, temp=1e-3):
         obs_post[3] = obs[player_0] + obs[player_1]
 
         next_states = obs_post.copy()
-
         replay_buffer.add(obs_post, action, reward, next_states, terminated)
+
+
 
         end, winners = env.winner()
 
@@ -143,7 +144,9 @@ def self_play(env, model, temp=1e-3):
 
 
 
-
+def policy_update():
+    model._store_transition(model.replay_buffer, np.array([action]), obs_post.reshape(*[1, *obs_post.shape]),
+                            np.array([reward]), np.array([terminated]), [info])
 
 
 
@@ -191,11 +194,11 @@ if __name__ == '__main__':
             collect_selfplay_data(self_play_sizes)
             print("1")
 
+        if len(data_buffer) > batch_size:
+            # data_buffer.append((rewards, wons))
+            a = policy_update()
 
-        for i in range(len(rewards)):
-            data_buffer.append((rewards, wons))
-
-        env.reset()
+        # env.reset()
 
 
 
@@ -228,17 +231,7 @@ if __name__ == '__main__':
 
             obs, reward, terminated, info = env.step(action)
 
-            # reward = np.abs(reward)  # make them equalized for any player
-            # -1 로 reward가 들어가게되면 문제가 생기긴하지만 일단 lock
 
-            num_timesteps += 1
-
-            obs_post[0] = obs[player_0]
-            obs_post[1] = obs[player_1]
-            obs_post[2] = np.zeros_like(obs[0])
-            # obs_post = obs[player_myself] + obs[player_enemy] * (-1)
-
-            c += 1
 
             model._store_transition(model.replay_buffer, np.array([action]), obs_post.reshape(*[1, *obs_post.shape]),
                                     np.array([reward]), np.array([terminated]), [info])

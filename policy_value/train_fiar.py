@@ -4,8 +4,8 @@ import random
 
 from Project.fiar_env import Fiar, turn, action2d_ize
 from collections import defaultdict, deque
-from Project.mcts import MCTSPlayer
-from Project.mcts_pure import MCTSPlayer as MCTS_Pure
+from Project.policy_value.mcts import MCTSPlayer
+from Project.policy_value.mcts_pure import MCTSPlayer as MCTS_Pure
 from policy_value_network import PolicyValueNet
 # from policy_value_network_mlp import PolicyValueNet
 

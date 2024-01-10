@@ -16,14 +16,26 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
         self.board_width = board_width
         self.board_height = board_height
-
         # state dimension
         state_dim = board_width * board_height
 
         self.flatten = nn.Flatten()
+
+        # common layers
         self.fc1 = nn.Linear(5 * state_dim, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, num_actions)
+
+        # common layers (cnn)
+        # self.conv1 = nn.Conv2d(5, 32, kernel_size=3, padding=1)
+        # self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        # self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+
+        # state value layers
+        self.val_conv1 = nn.Conv2d(128, 2, kernel_size=1)
+        self.val_fc1 = nn.Linear(2 * board_width * board_height, 64)
+        self.val_fc2 = nn.Linear(64, 1)
+
 
     def forward(self, x):
         # flatten input
@@ -59,7 +71,7 @@ class DQNNet():
 
 
 
-    def policy_value(self, state_batch):
+    def state_value(self, state_batch):
         """
         input: a batch of states
         output: a batch of action probabilities and state values

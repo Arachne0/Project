@@ -13,7 +13,7 @@ def softmax(x):
     return probs
 
 
-def policy_value_fn(board, net):
+def state_value_fn(board, net):
     available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
     current_state = np.ascontiguousarray(board.reshape(-1, 5, board.shape[1], board.shape[2]))
     log_act_probs, value = net(torch.from_numpy(current_state).float())
@@ -148,7 +148,6 @@ class MCTS(object):
                 )
 
             obs, _ = env.reset()
-            # print('reset_done')
 
         # print('end_one_playout')
         node.update_recursive(-leaf_value)

@@ -130,6 +130,7 @@ class MCTS(object):
             print('wtf')
 
         action_probs, leaf_value = policy_value_fn(obs, net)
+        # print(action_probs)
 
         # Check for end of game
         end, result = env.winner()
