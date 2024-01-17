@@ -33,7 +33,7 @@ def winning(state):
     elif state[3].sum() % 2 == 1:
         return 1  # black win
     else:
-        return -0.5  # white win
+        return -0.9  # white win
 
 
 def turn(state):
