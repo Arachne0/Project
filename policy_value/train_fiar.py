@@ -12,18 +12,17 @@ from policy_value_network import PolicyValueNet
 
 
 # fine-tuning models
-c_puct = 1  # = planning depth & training  1, 5, 10, 15
 n_playout = 2  # = MCTS simulations(n_mcts) & training 2, 20, 50, 100, 400
 check_freq = 50  # = iter & training 1, 10, 20, 50, 100
 
-
 # num of simulations for each move
 self_play_sizes = 1
-temp = 1e-3
 buffer_size = 10000
+c_puct = 5
 epochs = 5  # num of train_steps for each update
 self_play_times = 1000   # previous 1500
 pure_mcts_playout_num = 500     # previous 1000
+temp = 1e-3
 
 # policy update parameter
 batch_size = 64  # previous 512
@@ -53,7 +52,7 @@ def get_equi_data(env, play_data):
     for state, mcts_prob, winner in play_data:
         # flip horizontally
         equi_state = np.array([np.fliplr(s) for s in state])
-        equi_mcts_prob = np.fliplr(mcts_prob.reshape(env.state().shape[1], env.state().shape[2]))
+        equi_mcts_prob = np.fliplr(mcts_prob.reshape(env.state_.shape[1], env.state_.shape[2]))
         extend_data.append((equi_state,
                             np.flipud(equi_mcts_prob).flatten(),
                             winner))
@@ -87,7 +86,7 @@ def self_play(env, temp=1e-3):
             if obs[3].sum() == 36:
                 print('draw')
             else:
-                move, move_probs = mcts_player.get_action(env, obs_post, temp=temp, return_prob=1)
+                move, move_probs = mcts_player.get_action(env, temp=temp, return_prob=1)
                 action = move
             action2d = action2d_ize(action)
 
@@ -122,6 +121,7 @@ def self_play(env, temp=1e-3):
 
             # reset MCTS root node
             mcts_player.reset_player()
+
             print("batch i:{}, episode_len:{}".format(
                 i + 1, len(current_player)))
             winners_z = np.zeros(len(current_player))
@@ -206,7 +206,7 @@ def policy_evaluate(env, n_games=10):
         if winner == -0.9:
             winner = 0
         win_cnt[winner] += 1
-        print('one time evaluate end')
+        print("{} / 10 ".format(i+1))
 
     win_ratio = 1.0 * (win_cnt[1] + 0.5 * win_cnt[-1]) / n_games
 
@@ -218,7 +218,6 @@ def policy_evaluate(env, n_games=10):
 
 def start_play(env, player1, player2):
     """start a game between two players"""
-
     obs, _ = env.reset()
 
     players = [0, 1]
@@ -230,7 +229,7 @@ def start_play(env, player1, player2):
 
     while True:
         player_in_turn = players[current_player]
-        move = player_in_turn.get_action(env, obs)
+        move = player_in_turn.get_action(env)
         obs, reward, terminated, info = env.step(move)
 
         end, winner = env.winner()
@@ -289,7 +288,7 @@ if __name__ == '__main__':
                 print("win rate : ", win_ratio * 100, "%")
 
                 if (i + 1) % 50 == 0:
-                    current_model_name = './policy_value/depth1_nmcts2_iter50/alphaZero_4x9_{}.pt'.format(i + 1)
+                    current_model_name = 'nmcts2_iter50/alphaZero_4x9_{}.pth'.format(i + 1)
                     policy_value_net.save_model(current_model_name)
 
                     if win_ratio > best_win_ratio:
@@ -297,7 +296,7 @@ if __name__ == '__main__':
                         best_win_ratio = win_ratio
 
                         # update the best_policy
-                        best_model_name = './policy_value/depth1_nmcts2_iter50/best_policy_{}.pt'.format(i + 1)
+                        best_model_name = 'nmcts2_iter50/best_policy_{}.pth'.format(i + 1)
                         policy_value_net.save_model(best_model_name)
 
                         if (best_win_ratio == 1.0 and

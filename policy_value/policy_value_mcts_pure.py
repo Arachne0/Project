@@ -109,15 +109,12 @@ class MCTS(object):
         self._c_puct = c_puct
         self._n_playout = n_playout
 
-    def _playout(self, env, obs):
+    def _playout(self, env):
         """Run a single playout from the root to the leaf, getting a value at
         the leaf and propagating it back through its parents.
         State is modified in-place, so a copy must be provided.
         """
         node = self._root
-
-        if np.any(env.state_[3] != obs[3]):
-            print('wtf')
 
         while(1):
             if node.is_leaf():
@@ -125,7 +122,7 @@ class MCTS(object):
             # Greedily select next move.
             action, node = node.select(self._c_puct)
             obs, reward, terminated, info = env.step(action, node)
-        action_probs, _ = self._policy(obs)
+        action_probs, _ = self._policy(env.state_)
 
         # Check for end of game
         end, result = env.winner()
@@ -134,11 +131,11 @@ class MCTS(object):
             node.expand(action_probs)
 
         # Evaluate the leaf node by random rollout
-        leaf_value = self._evaluate_rollout(env, obs)
+        leaf_value = self._evaluate_rollout(env)
         # Update value and visit count of nodes in this traversal.
         node.update_recursive(-leaf_value)
 
-    def _evaluate_rollout(self, env, obs, limit=1000):
+    def _evaluate_rollout(self, env, limit=1000):
         """Use the rollout policy to play until the end of the game,
         returning +1 if the current player wins, -1 if the opponent wins,
         and 0 if it is a tie.
@@ -146,13 +143,9 @@ class MCTS(object):
         for i in range(limit):
             end, winner = env.winner()
 
-            if np.any(env.state_[3] != obs[3]):
-                print('wtf')
-
             if end:
                 break
-
-            action_probs = rollout_policy_fn(obs)
+            action_probs = rollout_policy_fn(env.state_)
             max_action = max(action_probs, key=itemgetter(1))[0]
             obs, reward, terminated, info = env.step(max_action)
 
@@ -165,14 +158,14 @@ class MCTS(object):
         else:
             return 1 if winner == 1 else -1
 
-    def get_move(self, env, state):
+    def get_move(self, env):
         """Runs all playouts sequentially and returns the most visited action.
         state: the current game state
 
         Return: the selected action
         """
         for n in range(self._n_playout):
-            self._playout(copy.deepcopy(env), copy.deepcopy(state))
+            self._playout(copy.deepcopy(env))
         return max(self._root._children.items(),
                    key=lambda act_node: act_node[1]._n_visits)[0]
 
@@ -201,12 +194,12 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
-    def get_action(self, env, board):
-        available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
+    def get_action(self, env):
+        available = [i for i in range(36) if env.state_[3][i // 4][i % 4] != 1]
         sensible_moves = available
 
         if len(sensible_moves) > 0:
-            move = self.mcts.get_move(env, board)
+            move = self.mcts.get_move(env)
             self.mcts.update_with_move(-1)
             return move
         else:

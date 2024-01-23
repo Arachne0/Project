@@ -29,7 +29,7 @@ def self_play(env, model):
             if np.random.rand() < eps:
                 action = env.action_space.sample()
             else:
-                move = mcts_player.get_action(env, obs_post)
+                move = mcts_player.get_action(env)
                 action = move
                 # action = model.predict(obs_post.reshape(*[1, *obs_post.shape]))[0]
                 # action = action[0]
