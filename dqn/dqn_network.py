@@ -130,9 +130,11 @@ class Agent:
         for ep in range(max_episodes):
             done, total_reward = False, 0
             state, _ = self.env.reset()
+
             while not done:
                 action = self.model.get_action(state)
                 next_state, reward, done, _, _ = self.env.step(action)
+
                 self.buffer.put(state, action, reward * 0.01, next_state, done)
                 total_reward += reward
                 state = next_state

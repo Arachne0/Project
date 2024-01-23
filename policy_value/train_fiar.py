@@ -2,12 +2,12 @@ import numpy as np
 import wandb
 import random
 
-
 from Project.fiar_env import Fiar, turn, action2d_ize
 from collections import defaultdict, deque
 from Project.policy_value.policy_value_mcts import MCTSPlayer
-from Project.policy_value.policy_value_mcts_pure import MCTSPlayer as MCTS_Pure
+from Project.policy_value.random_agent import RandomAction
 from policy_value_network import PolicyValueNet
+# from Project.policy_value.policy_value_mcts_pure import MCTSPlayer as MCTS_Pure
 # from policy_value_network_mlp import PolicyValueNet
 
 
@@ -195,14 +195,14 @@ def policy_evaluate(env, n_games=10):
     current_mcts_player = MCTSPlayer(policy_value_fn,
                                      c_puct=c_puct,
                                      n_playout=n_playout)
-    pure_mcts_player = MCTS_Pure(c_puct=5,
-                                 n_playout=pure_mcts_playout_num)
+    random_action_player = RandomAction()
+
     win_cnt = defaultdict(int)
 
     for i in range(n_games):
         winner = start_play(env,
                             current_mcts_player,
-                            pure_mcts_player)
+                            random_action_player)
         if winner == -0.9:
             winner = 0
         win_cnt[winner] += 1
