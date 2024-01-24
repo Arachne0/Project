@@ -1,9 +1,11 @@
-import numpy as np
 import copy
+import random
+import numpy as np
+
 from operator import itemgetter
 
 
-def rollout_policy_fn(board):   # board shape : (5, 9, 4)
+def rollout_policy_fn(board):  # board shape : (5, 9, 4)
     """a coarse, fast version of policy_fn used in the rollout phase."""
     # rollout randomly
     available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
@@ -16,7 +18,7 @@ def policy_value_fn(board):
     tuples and a score for the state"""
     # return uniform probabilities and 0 score for pure MCTS
     available = [i for i in range(36) if board[3][i // 4][i % 4] != 1]
-    action_probs = np.ones(len(available))/len(available)
+    action_probs = np.ones(len(available)) / len(available)
     return zip(available, action_probs), 0
 
 
@@ -61,7 +63,7 @@ class TreeNode(object):
         # Count visit.
         self._n_visits += 1
         # Update Q, a running average of values for all visits.
-        self._Q += 1.0*(leaf_value - self._Q) / self._n_visits
+        self._Q += 1.0 * (leaf_value - self._Q) / self._n_visits
 
     def update_recursive(self, leaf_value):
         """Like a call to update(), but applied recursively for all ancestors.
@@ -116,7 +118,7 @@ class MCTS(object):
         """
         node = self._root
 
-        while(1):
+        while (1):
             if node.is_leaf():
                 break
             # Greedily select next move.
@@ -185,6 +187,7 @@ class MCTS(object):
 
 class MCTSPlayer(object):
     """AI player based on MCTS"""
+
     def __init__(self, c_puct=5, n_playout=2000):
         self.mcts = MCTS(policy_value_fn, c_puct, n_playout)
 
@@ -207,3 +210,19 @@ class MCTSPlayer(object):
 
     def __str__(self):
         return "MCTS {}".format(self.player)
+
+
+class RandomAction(object):
+
+    def set_player_ind(self, p):
+        self.player = p
+
+    def get_action(self, env):
+        available = [i for i in range(36) if env.state_[3][i // 4][i % 4] != 1]
+        sensible_moves = available
+
+        if len(sensible_moves) > 0:
+            move = random.choice(sensible_moves)
+            return move
+        else:
+            print("WARNING: the board is full")

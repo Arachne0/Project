@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from torch.autograd import Variable
+from io import BytesIO
 
 
 def set_learning_rate(optimizer, lr):
@@ -72,8 +73,10 @@ class PolicyValueNet():
                                     weight_decay=self.l2_const)
 
         if model_file:
-            net_params = torch.load(model_file)
-            self.policy_value_net.load_state_dict(net_params)
+            with open(model_file, 'rb') as file:
+                buffer = BytesIO(file.read())
+                net_params = torch.load(buffer)
+                self.policy_value_net.load_state_dict(net_params)
 
     def policy_value(self, state_batch):
         """
@@ -156,6 +159,10 @@ class PolicyValueNet():
     def get_policy_param(self):
         net_params = self.policy_value_net.state_dict()
         return net_params
+
+    def load_model(self, model_file):
+        """ load model params from file """
+        self.policy_value_net.load_state_dict(torch.load(model_file))
 
     def save_model(self, model_file):
         """ save model params to file """

@@ -1,13 +1,16 @@
 import numpy as np
 import wandb
 import random
+import torch
+import pickle
 
 from Project.fiar_env import Fiar, turn, action2d_ize
 from collections import defaultdict, deque
 from Project.policy_value.policy_value_mcts import MCTSPlayer
-from Project.policy_value.random_agent import RandomAction
+from Project.policy_value.policy_value_mcts_pure import MCTSPlayer as MCTS_Pure
+from Project.policy_value.policy_value_mcts_pure import RandomAction
 from policy_value_network import PolicyValueNet
-# from Project.policy_value.policy_value_mcts_pure import MCTSPlayer as MCTS_Pure
+
 # from policy_value_network_mlp import PolicyValueNet
 
 
@@ -19,20 +22,18 @@ check_freq = 50  # = iter & training 1, 10, 20, 50, 100
 self_play_sizes = 1
 buffer_size = 10000
 c_puct = 5
-epochs = 5  # num of train_steps for each update
-self_play_times = 1000   # previous 1500
-pure_mcts_playout_num = 500     # previous 1000
-temp = 1e-3
+epochs = 10  # During each training iteration, the DNN is trained for10 epochs.
+self_play_times = 100  # 비교할 논문에서는 100번 했다고 함. # previous 1500
+temp = 1e-3  # [Todo] temp을 1에서 점차 줄여가는 방식으로 원 논문에서는 그렇게 되어있었음
 
 # policy update parameter
 batch_size = 64  # previous 512
 learn_rate = 2e-3
 lr_mul = 1.0
-lr_multiplier = 1.0     # adaptively adjust the learning rate based on KL
+lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
 best_win_ratio = 0.0
 
 kl_targ = 0.02  # previous 0.02
-
 
 init_model = None
 
@@ -187,7 +188,7 @@ def policy_update(lr_mul):
     return loss, entropy, lr_multiplier
 
 
-def policy_evaluate(env, n_games=10):
+def policy_evaluate(env, n_games=30):  # total 30 games
     """
     Evaluate the trained policy by playing against the pure MCTS player
     Note: this is only for monitoring the progress of training
@@ -195,25 +196,58 @@ def policy_evaluate(env, n_games=10):
     current_mcts_player = MCTSPlayer(policy_value_fn,
                                      c_puct=c_puct,
                                      n_playout=n_playout)
-    random_action_player = RandomAction()
-
+    random_action_player = RandomAction() # [Todo] 이것도 randomaciton이 아니라 pure mcts하는 걸로
     win_cnt = defaultdict(int)
 
-    for i in range(n_games):
+    for j in range(n_games):
         winner = start_play(env,
                             current_mcts_player,
                             random_action_player)
         if winner == -0.9:
             winner = 0
         win_cnt[winner] += 1
-        print("{} / 10 ".format(i+1))
+        print("{} / 30 ".format(j + 1))
 
     win_ratio = 1.0 * (win_cnt[1] + 0.5 * win_cnt[-1]) / n_games
-
-    print("num_playouts:{}, win: {}, lose: {}, tie:{}".format(
-        pure_mcts_playout_num,
+    print("win: {}, lose: {}, tie:{}".format(
         win_cnt[1], win_cnt[0], win_cnt[-1]))
     return win_ratio
+
+
+def policy_evaluate2(env, n_games=30): # [Todo] eval 1,2 합치고 , 각각 100개의 모델이 저장되도록
+
+    max_i = max(i for i in range(50, self_play_times, 50))
+    best_model_file = 'nmcts2_iter50/best_policy_{}.pth'.format(max_i)
+
+    policy_param = policy_value_net.load_model(best_model_file)
+    best_policy = PolicyValueNet(env.state_.shape[1],
+                                 env.state_.shape[2],
+                                 policy_param)
+
+    prev_best_player = MCTSPlayer(best_policy.policy_value_fn,
+                                  c_puct=5,
+                                  n_playout=400)
+    win_cnt = defaultdict(int)
+
+    print("current self-play batch: {}".format(i + 1))
+
+    for j in range(n_games):
+        winner = start_play(env,
+                            mcts_player,
+                            prev_best_player)
+        if winner == -0.9:
+            winner = 0
+        win_cnt[winner] += 1
+        print("{} / 30 ".format(j + 1))
+
+        win_ratio = 1.0 * (win_cnt[1] + 0.5 * win_cnt[-1]) / n_games
+        print("win: {}, lose: {}, tie:{}".format(
+            win_cnt[1], win_cnt[0], win_cnt[-1]))
+
+    # win_ratio = policy_evaluate(env)
+    print("win rate : ", win_ratio * 100, "%")
+    return win_ratio
+
 
 
 def start_play(env, player1, player2):
@@ -248,10 +282,11 @@ if __name__ == '__main__':
                entity="hails",
                project="policy_value_4iar")
 
+    win_ratio = 0.0
     env = Fiar()
     obs, _ = env.reset()
     data_buffer = deque(maxlen=buffer_size)
-    policy_value_net = PolicyValueNet(obs.shape[1], obs.shape[2])
+    # policy_value_net = PolicyValueNet(obs.shape[1], obs.shape[2])
 
     turn_A = turn(obs)
     turn_B = 1 - turn_A
@@ -287,28 +322,33 @@ if __name__ == '__main__':
                 win_ratio = policy_evaluate(env)
                 print("win rate : ", win_ratio * 100, "%")
 
-                if (i + 1) % 50 == 0:
-                    current_model_name = 'nmcts2_iter50/alphaZero_4x9_{}.pth'.format(i + 1)
-                    policy_value_net.save_model(current_model_name)
+                if (i + 1) == 50:
+                    print("New policy!!!!!!!!")
+                    # update the best_policy
+                    model_file = 'nmcts2_iter50/best_policy_{}.pth'.format(i + 1)
+                    policy_value_net.save_model(model_file)
+                    best_win_ratio = win_ratio
+
+
+                # ############### AI VS AI ###################
+                # load the trained policy_value_net
+
+                elif (i + 1) % 50 == 0:
+                    print("current self-play batch: {}".format(i + 1))
+                    win_ratio = policy_evaluate2(env)
+                    print("win rate : ", win_ratio * 100, "%")
 
                     if win_ratio > best_win_ratio:
                         print("New best policy!!!!!!!!")
                         best_win_ratio = win_ratio
 
                         # update the best_policy
-                        best_model_name = 'nmcts2_iter50/best_policy_{}.pth'.format(i + 1)
-                        policy_value_net.save_model(best_model_name)
+                        model_file = 'nmcts2_iter50/best_policy_{}.pth'.format(i + 1)
+                        policy_value_net.save_model(model_file)
 
-                        if (best_win_ratio == 1.0 and
-                                pure_mcts_playout_num < 5000):
-                            pure_mcts_playout_num += 500    # previous 1000
-                            print("Pure mcts level up!!!")
-                            best_win_ratio = 0.0
-                    wandb.log({"Pure mcts level": pure_mcts_playout_num})
-
-                if i >= 2000:
-                    print("Stopping the loop as i exceeds 2000")
-                    break
+            if i >= 2000:
+                print("Stopping the loop as i exceeds 2000")
+                break
 
     except KeyboardInterrupt:
         print('\n\rquit')
