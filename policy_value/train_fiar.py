@@ -1,14 +1,12 @@
 import numpy as np
 import wandb
 import random
-import torch
-import pickle
 
 from Project.fiar_env import Fiar, turn, action2d_ize
 from collections import defaultdict, deque
 from Project.policy_value.policy_value_mcts import MCTSPlayer
 from Project.policy_value.policy_value_mcts_pure import MCTSPlayer as MCTS_Pure
-from Project.policy_value.policy_value_mcts_pure import RandomAction
+# from Project.policy_value.policy_value_mcts_pure import RandomAction
 from policy_value_network import PolicyValueNet
 
 # from policy_value_network_mlp import PolicyValueNet
@@ -32,7 +30,9 @@ learn_rate = 2e-3
 lr_mul = 1.0
 lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
 best_win_ratio = 0.0
+pure_mcts_playout_num = 2  # [todo] 디버깅하려고 줄여놓음 previous 500
 
+win_ratio = 0.0
 kl_targ = 0.02  # previous 0.02
 
 init_model = None
@@ -188,21 +188,20 @@ def policy_update(lr_mul):
     return loss, entropy, lr_multiplier
 
 
-def policy_evaluate(env, n_games=30):  # total 30 games
+def policy_evaluate(env, n_games=2):  # total 30 games
     """
     Evaluate the trained policy by playing against the pure MCTS player
     Note: this is only for monitoring the progress of training
     """
-    current_mcts_player = MCTSPlayer(policy_value_fn,
-                                     c_puct=c_puct,
-                                     n_playout=n_playout)
-    random_action_player = RandomAction() # [Todo] 이것도 randomaciton이 아니라 pure mcts하는 걸로
+    current_mcts_player = MCTSPlayer(policy_value_fn, c_puct=c_puct, n_playout=n_playout)   # training Agent
+    pure_mcts_player = MCTS_Pure(c_puct=5, n_playout=pure_mcts_playout_num)  # first evaluate Agent
+    # random_action_player = RandomAction() # random actions Agent
+
     win_cnt = defaultdict(int)
 
     for j in range(n_games):
-        winner = start_play(env,
-                            current_mcts_player,
-                            random_action_player)
+        winner = start_play(env, current_mcts_player, pure_mcts_player)
+
         if winner == -0.9:
             winner = 0
         win_cnt[winner] += 1
@@ -214,11 +213,10 @@ def policy_evaluate(env, n_games=30):  # total 30 games
     return win_ratio
 
 
-def policy_evaluate2(env, n_games=30): # [Todo] eval 1,2 합치고 , 각각 100개의 모델이 저장되도록
+def policy_evaluate2(env, n_games=30):
 
     max_i = max(i for i in range(50, self_play_times, 50))
     best_model_file = 'nmcts2_iter50/best_policy_{}.pth'.format(max_i)
-
     policy_param = policy_value_net.load_model(best_model_file)
     best_policy = PolicyValueNet(env.state_.shape[1],
                                  env.state_.shape[2],
@@ -228,8 +226,6 @@ def policy_evaluate2(env, n_games=30): # [Todo] eval 1,2 합치고 , 각각 100�
                                   c_puct=5,
                                   n_playout=400)
     win_cnt = defaultdict(int)
-
-    print("current self-play batch: {}".format(i + 1))
 
     for j in range(n_games):
         winner = start_play(env,
@@ -249,7 +245,6 @@ def policy_evaluate2(env, n_games=30): # [Todo] eval 1,2 합치고 , 각각 100�
     return win_ratio
 
 
-
 def start_play(env, player1, player2):
     """start a game between two players"""
     obs, _ = env.reset()
@@ -263,6 +258,7 @@ def start_play(env, player1, player2):
 
     while True:
         player_in_turn = players[current_player]
+        print("도레미파솔라시도")
         move = player_in_turn.get_action(env)
         obs, reward, terminated, info = env.step(move)
 
@@ -270,7 +266,6 @@ def start_play(env, player1, player2):
 
         if not end:
             current_player = 1 - current_player
-
         else:
             print(env)
             return winner
@@ -282,11 +277,9 @@ if __name__ == '__main__':
                entity="hails",
                project="policy_value_4iar")
 
-    win_ratio = 0.0
     env = Fiar()
     obs, _ = env.reset()
     data_buffer = deque(maxlen=buffer_size)
-    # policy_value_net = PolicyValueNet(obs.shape[1], obs.shape[2])
 
     turn_A = turn(obs)
     turn_B = 1 - turn_A
@@ -319,35 +312,30 @@ if __name__ == '__main__':
 
             if (i + 1) % check_freq == 0:
                 print("current self-play batch: {}".format(i + 1))
-                win_ratio = policy_evaluate(env)
-                print("win rate : ", win_ratio * 100, "%")
 
-                if (i + 1) == 50:
-                    print("New policy!!!!!!!!")
-                    # update the best_policy
+                if (i + 1) == check_freq:
+                    win_ratio = policy_evaluate(env)
+                    print("win rate : ", win_ratio * 100, "%")
+
                     model_file = 'nmcts2_iter50/best_policy_{}.pth'.format(i + 1)
                     policy_value_net.save_model(model_file)
                     best_win_ratio = win_ratio
 
-
                 # ############### AI VS AI ###################
                 # load the trained policy_value_net
 
-                elif (i + 1) % 50 == 0:
-                    print("current self-play batch: {}".format(i + 1))
+                else:
                     win_ratio = policy_evaluate2(env)
                     print("win rate : ", win_ratio * 100, "%")
 
-                    if win_ratio > best_win_ratio:
+                    if win_ratio > best_win_ratio:  # update the best_policy
                         print("New best policy!!!!!!!!")
                         best_win_ratio = win_ratio
-
-                        # update the best_policy
                         model_file = 'nmcts2_iter50/best_policy_{}.pth'.format(i + 1)
                         policy_value_net.save_model(model_file)
 
-            if i >= 2000:
-                print("Stopping the loop as i exceeds 2000")
+            if i > 5000:    # Save up to 100 models
+                print("End loop")
                 break
 
     except KeyboardInterrupt:
