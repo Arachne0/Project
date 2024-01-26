@@ -71,12 +71,13 @@ class PolicyValueNet():
             self.policy_value_net = Net(board_width, board_height)
         self.optimizer = optim.Adam(self.policy_value_net.parameters(),
                                     weight_decay=self.l2_const)
-
         if model_file:
-            with open(model_file, 'rb') as file:
-                buffer = BytesIO(file.read())
-                net_params = torch.load(buffer)
-                self.policy_value_net.load_state_dict(net_params)
+            net_params = torch.load(model_file)
+            self.policy_value_net.load_state_dict(net_params)
+
+
+
+
 
     def policy_value(self, state_batch):
         """
@@ -162,12 +163,13 @@ class PolicyValueNet():
 
     def load_model(self, model_file):
         """ load model params from file """
-        self.policy_value_net.load_state_dict(torch.load(model_file))
+        state_dict = torch.load(model_file)
+        self.policy_value_net.load_state_dict(state_dict)
+        return state_dict
 
     def save_model(self, model_file):
         """ save model params to file """
         net_params = self.get_policy_param()  # get model params
         # Ensure that the directory exists before saving the file
         os.makedirs(os.path.dirname(model_file), exist_ok=True)
-
         torch.save(net_params, model_file)

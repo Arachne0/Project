@@ -218,13 +218,12 @@ def policy_evaluate2(env, n_games=30):
     max_i = max(i for i in range(50, self_play_times, 50))
     best_model_file = 'nmcts2_iter50/best_policy_{}.pth'.format(max_i)
     policy_param = policy_value_net.load_model(best_model_file)
-    best_policy = PolicyValueNet(env.state_.shape[1],
-                                 env.state_.shape[2],
-                                 policy_param)
+    best_policy = PolicyValueNet(env.state_.shape[1], env.state_.shape[2], model_file=policy_param)
 
     prev_best_player = MCTSPlayer(best_policy.policy_value_fn,
                                   c_puct=5,
-                                  n_playout=400)
+                                  n_playout=400
+                                  )
     win_cnt = defaultdict(int)
 
     for j in range(n_games):
@@ -248,7 +247,6 @@ def policy_evaluate2(env, n_games=30):
 def start_play(env, player1, player2):
     """start a game between two players"""
     obs, _ = env.reset()
-
     players = [0, 1]
     p1, p2 = players
     player1.set_player_ind(p1)
@@ -258,16 +256,15 @@ def start_play(env, player1, player2):
 
     while True:
         player_in_turn = players[current_player]
-        print("도레미파솔라시도")
         move = player_in_turn.get_action(env)
         obs, reward, terminated, info = env.step(move)
-
         end, winner = env.winner()
 
         if not end:
             current_player = 1 - current_player
         else:
             print(env)
+            obs, _ = env.reset()
             return winner
 
 
@@ -326,6 +323,11 @@ if __name__ == '__main__':
 
                 else:
                     win_ratio = policy_evaluate2(env)
+                    print(win_ratio)
+
+
+
+
                     print("win rate : ", win_ratio * 100, "%")
 
                     if win_ratio > best_win_ratio:  # update the best_policy

@@ -76,7 +76,6 @@ class TreeNode(object):
         if self._parent:
             self._parent.update_recursive(-leaf_value)
         self.update(leaf_value)
-
     def get_value(self, c_puct):
         """Calculate and return the value for this node.
         It is a combination of leaf evaluations Q, and this node's prior
