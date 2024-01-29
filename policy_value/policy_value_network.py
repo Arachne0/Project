@@ -72,8 +72,10 @@ class PolicyValueNet():
         self.optimizer = optim.Adam(self.policy_value_net.parameters(),
                                     weight_decay=self.l2_const)
         if model_file:
-            net_params = torch.load(model_file)
-            self.policy_value_net.load_state_dict(net_params)
+            state_dict = torch.load(model_file)
+            self.policy_value_net.load_state_dict(state_dict)
+
+
 
 
 
@@ -161,11 +163,11 @@ class PolicyValueNet():
         net_params = self.policy_value_net.state_dict()
         return net_params
 
-    def load_model(self, model_file):
-        """ load model params from file """
-        state_dict = torch.load(model_file)
-        self.policy_value_net.load_state_dict(state_dict)
-        return state_dict
+    # def load_model(self, model_file):
+    #     """ load model params from file """
+    #    state_dict = torch.load(model_file)
+    #    self.policy_value_net.load_state_dict(state_dict)
+    #    return state_dict
 
     def save_model(self, model_file):
         """ save model params to file """

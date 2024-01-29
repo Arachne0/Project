@@ -1,6 +1,7 @@
 import numpy as np
 import wandb
 import random
+import os
 
 from Project.fiar_env import Fiar, turn, action2d_ize
 from collections import defaultdict, deque
@@ -85,7 +86,7 @@ def self_play(env, temp=1e-3):
             action = None
             move_probs = None
             if obs[3].sum() == 36:
-                print('draw')
+                print('self_play_draw')
             else:
                 move, move_probs = mcts_player.get_action(env, temp=temp, return_prob=1)
                 action = move
@@ -115,7 +116,7 @@ def self_play(env, temp=1e-3):
 
         if end:
             if obs[3].sum() == 36:
-                print('draw')
+                print('self_play_draw')
 
             print(env)
             obs, _ = env.reset()
@@ -217,8 +218,8 @@ def policy_evaluate2(env, n_games=30):
 
     max_i = max(i for i in range(50, self_play_times, 50))
     best_model_file = 'nmcts2_iter50/best_policy_{}.pth'.format(max_i)
-    policy_param = policy_value_net.load_model(best_model_file)
-    best_policy = PolicyValueNet(env.state_.shape[1], env.state_.shape[2], model_file=policy_param)
+    # policy_param = policy_value_net.load_model(best_model_file)
+    best_policy = PolicyValueNet(env.state_.shape[1], env.state_.shape[2], model_file=best_model_file)
 
     prev_best_player = MCTSPlayer(best_policy.policy_value_fn,
                                   c_puct=5,
@@ -232,7 +233,7 @@ def policy_evaluate2(env, n_games=30):
                             prev_best_player)
         if winner == -0.9:
             winner = 0
-        win_cnt[winner] += 1
+        win_cnt[winner] += 1    # white win
         print("{} / 30 ".format(j + 1))
 
         win_ratio = 1.0 * (win_cnt[1] + 0.5 * win_cnt[-1]) / n_games
