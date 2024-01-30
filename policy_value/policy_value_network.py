@@ -20,6 +20,8 @@ class Net(nn.Module):
 
     def __init__(self, board_width, board_height):
         super(Net, self).__init__()
+        self.c_puct = 5
+        self.n_playout = 2
 
         self.board_width = board_width
         self.board_height = board_height
@@ -164,7 +166,7 @@ class PolicyValueNet():
         return net_params
 
     # def load_model(self, model_file):
-    #     """ load model params from file """
+    #    """ load model params from file """
     #    state_dict = torch.load(model_file)
     #    self.policy_value_net.load_state_dict(state_dict)
     #    return state_dict
