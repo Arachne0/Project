@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from torch.autograd import Variable
+from io import BytesIO
 
 
 def set_learning_rate(optimizer, lr):
@@ -19,6 +20,8 @@ class Net(nn.Module):
 
     def __init__(self, board_width, board_height):
         super(Net, self).__init__()
+        self.c_puct = 5
+        self.n_playout = 2
 
         self.board_width = board_width
         self.board_height = board_height
@@ -70,10 +73,15 @@ class PolicyValueNet():
             self.policy_value_net = Net(board_width, board_height)
         self.optimizer = optim.Adam(self.policy_value_net.parameters(),
                                     weight_decay=self.l2_const)
-
         if model_file:
-            net_params = torch.load(model_file)
-            self.policy_value_net.load_state_dict(net_params)
+            state_dict = torch.load(model_file)
+            self.policy_value_net.load_state_dict(state_dict)
+
+
+
+
+
+
 
     def policy_value(self, state_batch):
         """
@@ -157,10 +165,15 @@ class PolicyValueNet():
         net_params = self.policy_value_net.state_dict()
         return net_params
 
+    # def load_model(self, model_file):
+    #    """ load model params from file """
+    #    state_dict = torch.load(model_file)
+    #    self.policy_value_net.load_state_dict(state_dict)
+    #    return state_dict
+
     def save_model(self, model_file):
         """ save model params to file """
         net_params = self.get_policy_param()  # get model params
         # Ensure that the directory exists before saving the file
         os.makedirs(os.path.dirname(model_file), exist_ok=True)
-
         torch.save(net_params, model_file)

@@ -1,5 +1,5 @@
 import numpy as np
-import wandb
+# import wandb
 import random
 import os
 
@@ -27,7 +27,7 @@ temp = 1e-3  # [Todo] temp을 1에서 점차 줄여가는 방식으로 원 논�
 
 # policy update parameter
 batch_size = 64  # previous 512
-learn_rate = 1e-4   # previous 2e-3
+learn_rate = 2e-4   # previous 2e-3
 lr_mul = 1.0
 lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
 best_win_ratio = 0.0
@@ -219,7 +219,7 @@ def policy_evaluate(env, n_games=30):  # total 30 games
 def policy_evaluate2(env, n_games=30):
 
     max_i = max(i for i in range(50, self_play_times, 50))
-    best_model_file = 'nmcts2_iter50/best_policy_{}.pth'.format(max_i)
+    best_model_file = 'nmcts2_iter50/pure_mcts_{}.pth'.format(max_i)
     best_policy = PolicyValueNet(env.state_.shape[1], env.state_.shape[2], best_model_file)
 
     prev_best_player = MCTSPlayer(best_policy.policy_value_fn,
@@ -258,7 +258,6 @@ def start_play(env, player1, player2):
     while True:
         player_in_turn = players[current_player]
         move = player_in_turn.get_action(env)
-        print(move)
         obs, reward, terminated, info = env.step(move)
         end, winner = env.winner()
 
@@ -266,15 +265,15 @@ def start_play(env, player1, player2):
             current_player = 1 - current_player
         else:
             print(env)
-            env.reset()
+            obs, _ = env.reset()
             return winner
 
 
 if __name__ == '__main__':
 
-    wandb.init(mode="offline",
-               entity="hails",
-               project="policy_value_4iar")
+    # wandb.init(mode="offline",
+    #           entity="hails",
+    #           project="policy_value_4iar")
 
     env = Fiar()
     obs, _ = env.reset()
@@ -307,7 +306,7 @@ if __name__ == '__main__':
 
             if len(data_buffer) > batch_size:
                 loss, entropy, lr_multiplier = policy_update(lr_mul=lr_multiplier)
-                wandb.log({"loss": loss, "entropy": entropy})
+                # wandb.log({"loss": loss, "entropy": entropy})
 
             if (i + 1) % check_freq == 0:
                 print("current self-play batch: {}".format(i + 1))

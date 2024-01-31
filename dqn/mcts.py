@@ -2,7 +2,7 @@ import numpy as np
 import copy
 import torch
 
-from Project.policy_value.policy_value_network import Net
+from Project.dqn.policy_value_network import Net
 
 
 def softmax(x):
@@ -76,7 +76,6 @@ class TreeNode(object):
         if self._parent:
             self._parent.update_recursive(-leaf_value)
         self.update(leaf_value)
-
     def get_value(self, c_puct):
         """Calculate and return the value for this node.
         It is a combination of leaf evaluations Q, and this node's prior
@@ -133,6 +132,7 @@ class MCTS(object):
             action, node = node.select(self._c_puct)
             obs, reward, terminated, info = env.step(action, node)
 
+
         action_probs, leaf_value = policy_value_fn(env.state_, net)
         # print(action_probs)
 
@@ -161,6 +161,7 @@ class MCTS(object):
         temp: temperature parameter in (0, 1] controls the level of exploration
         """
         for n in range(self._n_playout):  # for 400 times
+            print(copy.deepcopy(env))
             self._playout(copy.deepcopy(env))  # state_copy.shape = (5,9,4)
 
         # calc the move probabilities based on visit counts at the root node

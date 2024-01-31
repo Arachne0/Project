@@ -82,7 +82,6 @@ class PolicyValueNet():
 
 
 
-
     def policy_value(self, state_batch):
         """
         input: a batch of states
